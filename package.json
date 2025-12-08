@@ -1,0 +1,32 @@
+{
+  "name": "snap-stream",
+  "version": "1.0.0",
+  "description": "Snap Stream - Live Streaming & Recording Platform",
+  "private": true,
+  "scripts": {
+    "dev": "concurrently -n \"BACKEND,MEDIA,FRONTEND\" -c \"blue,green,yellow\" \"npm run dev:backend\" \"npm run dev:media\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm start",
+    "dev:media": "cd backend && npm run media",
+    "dev:frontend": "cd frontend && npm run dev:electron",
+    "dev:all": "concurrently -n \"BACKEND+MEDIA,FRONTEND\" -c \"cyan,yellow\" \"cd backend && npm run start:all\" \"cd frontend && npm run dev:electron\"",
+    "dev:web": "concurrently -n \"BACKEND+MEDIA,FRONTEND\" -c \"cyan,yellow\" \"cd backend && npm run start:all\" \"cd frontend && npm run dev\"",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install",
+    "build": "cd frontend && npm run build",
+    "start": "cd backend && npm start"
+  },
+  "keywords": [
+    "streaming",
+    "recording",
+    "mediasoup",
+    "electron"
+  ],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "dotenv-cli": "^11.0.0"
+  }
+}
