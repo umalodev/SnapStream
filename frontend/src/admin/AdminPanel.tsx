@@ -186,17 +186,6 @@ const AdminPanel: React.FC = () => {
           >
             <i className="fas fa-bars" style={{ fontSize: 20, color: GRAY_TEXT }} />
           </button>
-
-          {/* GREETING TEXT (Desktop only) */}
-          {! isMobile && (
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <i className="fas fa-sun" style={{ color: "#f59e0b", fontSize: 20 }} />
-              <span style={{ fontSize: 18, fontWeight: 600, color: "#1e293b" }}>
-                Welcome back, {displayName. split(" ")[0]}!  
-              </span>
-            </div>
-          )}
-
           {/* PROFILE DROPDOWN */}
           <div
             style={{
