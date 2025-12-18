@@ -139,6 +139,8 @@ const AdminRecordingPage: React.FC = () => {
   } = useStreaming();
 
   const [recordings, setRecordings] = useState<any[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
   const [showPopup, setShowPopup] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [confirmAction, setConfirmAction] = useState<(() => void) | null>(null);
@@ -223,6 +225,12 @@ const AdminRecordingPage: React.FC = () => {
   const isMobile = windowWidth < 768;
   const isTablet = windowWidth >= 768 && windowWidth < 1024;
 
+  // Pagination logic
+  const totalPages = Math.ceil(recordings.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const paginatedRecordings = recordings.slice(startIndex, endIndex);
+
   const fetchRecordings = async () => {
     try {
       const res = await fetch(`${API_URL}/api/recording`);
@@ -238,6 +246,13 @@ const AdminRecordingPage: React.FC = () => {
   useEffect(() => {
     fetchRecordings();
   }, []);
+
+  // Reset to page 1 when recordings change
+  useEffect(() => {
+    if (currentPage > totalPages && totalPages > 0) {
+      setCurrentPage(1);
+    }
+  }, [recordings.length, currentPage, totalPages]);
 
   // Reset partial state when recording berhenti (bukan di finished page)
   useEffect(() => {
@@ -1704,7 +1719,7 @@ const AdminRecordingPage: React.FC = () => {
                       borderTop: isMobile ? "1px solid #e5e7eb" : "none",
                     }}
                   >
-                    {recordings.slice(0, 10).map(
+                    {paginatedRecordings.map(
                       (recording: any, idx: number) => (
                         <div
                           key={recording.id}
@@ -1718,7 +1733,7 @@ const AdminRecordingPage: React.FC = () => {
                               : "14px 16px",
                             borderBottom:
                               idx <
-                              recordings.slice(0, 10).length - 1
+                              paginatedRecordings.length - 1
                                 ? "1px solid #e5e7eb"
                                 : "none",
                             transition: "all 0.2s ease",
@@ -1968,6 +1983,218 @@ const AdminRecordingPage: React.FC = () => {
                       )
                     )}
                   </div>
+
+                  {/* PAGINATION */}
+                  {totalPages > 1 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginTop: "20px",
+                        padding: isMobile ? "16px" : "20px",
+                        background: "linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%)",
+                        borderRadius: 12,
+                        border: "1px solid #e5e7eb",
+                        flexDirection: isMobile ? "column" : "row",
+                        gap: isMobile ? "12px" : "0",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "14px",
+                          color: "#6b7280",
+                          fontWeight: 500,
+                          textAlign: isMobile ? "center" : "left",
+                        }}
+                      >
+                        Menampilkan{" "}
+                        <strong
+                          style={{
+                            color: COLORS.green,
+                            fontWeight: 700,
+                            fontSize: "15px",
+                          }}
+                        >
+                          {startIndex + 1}-{Math.min(endIndex, recordings.length)}
+                        </strong>{" "}
+                        dari{" "}
+                        <strong
+                          style={{
+                            color: "#1e293b",
+                            fontWeight: 700,
+                            fontSize: "15px",
+                          }}
+                        >
+                          {recordings.length}
+                        </strong>{" "}
+                        video
+                      </div>
+
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                        }}
+                      >
+                        {/* Prev */}
+                        <button
+                          onClick={() =>
+                            setCurrentPage((prev) => Math.max(prev - 1, 1))
+                          }
+                          disabled={currentPage === 1}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            background:
+                              currentPage === 1 ? "#f3f4f6" : "#ffffff",
+                            color:
+                              currentPage === 1 ? "#9ca3af" : "#374151",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            cursor:
+                              currentPage === 1 ? "not-allowed" : "pointer",
+                            border: "1px solid #e5e7eb",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.2s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (currentPage !== 1) {
+                              e.currentTarget.style.background = "#f9fafb";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (currentPage !== 1) {
+                              e.currentTarget.style.background = "#ffffff";
+                            }
+                          }}
+                        >
+                          <i className="fas fa-chevron-left" style={{ fontSize: "12px" }} />
+                        </button>
+
+                        {/* Page numbers */}
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "6px",
+                            alignItems: "center",
+                          }}
+                        >
+                          {Array.from(
+                            { length: Math.min(totalPages, 5) },
+                            (_, i) => {
+                              let page: number;
+                              if (totalPages <= 5) {
+                                page = i + 1;
+                              } else if (currentPage <= 3) {
+                                page = i + 1;
+                              } else if (currentPage >= totalPages - 2) {
+                                page = totalPages - 4 + i;
+                              } else {
+                                page = currentPage - 2 + i;
+                              }
+
+                              const isActive = currentPage === page;
+
+                              return (
+                                <button
+                                  key={page}
+                                  onClick={() => setCurrentPage(page)}
+                                  style={{
+                                    padding: "8px 12px",
+                                    borderRadius: 8,
+                                    background: isActive
+                                      ? "linear-gradient(135deg, #10b981 0%, #059669 100%)"
+                                      : "#ffffff",
+                                    color: isActive ? "#ffffff" : "#374151",
+                                    fontSize: "14px",
+                                    fontWeight: isActive ? 700 : 600,
+                                    cursor: "pointer",
+                                    border: `2px solid ${
+                                      isActive ? COLORS.green : "#e5e7eb"
+                                    }`,
+                                    transition: "all 0.2s ease",
+                                    minWidth: 40,
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    if (!isActive) {
+                                      e.currentTarget.style.background = "#f9fafb";
+                                    }
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    if (!isActive) {
+                                      e.currentTarget.style.background = "#ffffff";
+                                    }
+                                  }}
+                                >
+                                  {page}
+                                </button>
+                              );
+                            }
+                          )}
+
+                          {totalPages > 5 && currentPage < totalPages - 2 && (
+                            <span
+                              style={{
+                                color: "#9ca3af",
+                                fontSize: "16px",
+                                fontWeight: 700,
+                                padding: "0 4px",
+                              }}
+                            >
+                              ...
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Next */}
+                        <button
+                          onClick={() =>
+                            setCurrentPage((prev) => Math.min(prev + 1, totalPages))
+                          }
+                          disabled={currentPage === totalPages}
+                          style={{
+                            padding: "8px 12px",
+                            borderRadius: 8,
+                            background:
+                              currentPage === totalPages
+                                ? "#f3f4f6"
+                                : "#ffffff",
+                            color:
+                              currentPage === totalPages
+                                ? "#9ca3af"
+                                : "#374151",
+                            fontSize: "14px",
+                            fontWeight: 600,
+                            cursor:
+                              currentPage === totalPages
+                                ? "not-allowed"
+                                : "pointer",
+                            border: "1px solid #e5e7eb",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            transition: "all 0.2s ease",
+                          }}
+                          onMouseEnter={(e) => {
+                            if (currentPage !== totalPages) {
+                              e.currentTarget.style.background = "#f9fafb";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (currentPage !== totalPages) {
+                              e.currentTarget.style.background = "#ffffff";
+                            }
+                          }}
+                        >
+                          <i className="fas fa-chevron-right" style={{ fontSize: "12px" }} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
           </div>
