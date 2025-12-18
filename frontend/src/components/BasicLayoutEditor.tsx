@@ -164,6 +164,8 @@ useEffect(() => {
         document.body.appendChild(video);
 
         videoElementsRef.current[camera.deviceId] = video;
+        // Update state to trigger re-render
+        setVideoElements({ ...videoElementsRef.current });
       } catch (err) {
         console.error(`Camera init failed: ${camera.deviceId}`, err);
       }
@@ -208,6 +210,8 @@ useEffect(() => {
         document.body.appendChild(screenVideo);
 
         screenVideoRef.current = screenVideo;
+        // Update state to trigger re-render
+        setScreenVideoElement(screenVideo);
       } catch (err) {
         console.error('Screen init failed', err);
       }
@@ -254,34 +258,111 @@ useEffect(() => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Clear canvas
-    ctx.fillStyle = '#000000';
+    // Clear canvas with gradient background instead of solid black
+    const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+    gradient.addColorStop(0, '#1a1a1a');
+    gradient.addColorStop(1, '#2d2d2d');
+    ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+    // Draw grid pattern for better visual
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    const gridSize = 50;
+    for (let x = 0; x <= canvas.width; x += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+    for (let y = 0; y <= canvas.height; y += gridSize) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+
     // Draw each layout (only enabled ones)
-    layouts.filter(layout => layout.enabled).forEach(layout => {
+    const enabledLayouts = layouts.filter(layout => layout.enabled);
+    
+    if (enabledLayouts.length === 0) {
+      // Show placeholder when no layouts are enabled
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.font = 'bold 24px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('Pilih Kamera yang Aktif', canvas.width / 2, canvas.height / 2);
+      ctx.font = '16px Arial';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.fillText('Aktifkan kamera dari daftar di bawah', canvas.width / 2, canvas.height / 2 + 40);
+      return;
+    }
+
+    enabledLayouts.forEach(layout => {
       let video: HTMLVideoElement | null = null;
       
-      // Get video element - either from cameras or screen
+      // Get video element - either from cameras or screen (use ref for real-time access)
       if (layout.deviceId === 'screen') {
-        video = screenVideoElement;
+        video = screenVideoRef.current || screenVideoElement;
       } else {
-        video = videoElements[layout.deviceId];
+        video = videoElementsRef.current[layout.deviceId] || videoElements[layout.deviceId];
       }
       
-      if (!video || video.readyState < 2) return;
-
       const x = (layout.x / 100) * canvas.width;
       const y = (layout.y / 100) * canvas.height;
       const width = (layout.width / 100) * canvas.width;
       const height = (layout.height / 100) * canvas.height;
 
-      try {
-        // Draw video frame
-        ctx.drawImage(video, x, y, width, height);
+      // Draw placeholder background for this layout area
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+      ctx.fillRect(x, y, width, height);
 
-        // Draw border
-        ctx.strokeStyle = '#ffffff';
+      const label = layout.deviceId === 'screen' ? 'Layar' : layout.label;
+
+      if (!video) {
+        // Draw placeholder when video element doesn't exist
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(label, x + width / 2, y + height / 2);
+        ctx.font = '12px Arial';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.fillText('Initializing...', x + width / 2, y + height / 2 + 20);
+        return;
+      }
+
+      // Always try to draw video, even if readyState is low
+      // Video streams can show frames before readyState reaches 2
+      try {
+        let hasVideoFrame = false;
+        
+        // Always try to draw video frame - even if dimensions are 0
+        // This allows showing video as soon as first frame arrives
+        try {
+          ctx.drawImage(video, x, y, width, height);
+          hasVideoFrame = true;
+        } catch (drawError) {
+          // Video not ready yet or no frame available
+          hasVideoFrame = false;
+        }
+
+        // If no video frame, show subtle loading overlay
+        if (!hasVideoFrame) {
+          // Show semi-transparent overlay so if video starts, it shows through
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+          ctx.fillRect(x, y, width, height);
+          
+          // Show loading text
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+          ctx.font = '13px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Loading...', x + width / 2, y + height / 2);
+        }
+
+        // Draw border - brighter when video is ready
+        ctx.strokeStyle = hasVideoFrame ? '#ffffff' : 'rgba(255, 255, 255, 0.5)';
         ctx.lineWidth = 2;
         ctx.strokeRect(x, y, width, height);
 
@@ -292,13 +373,35 @@ useEffect(() => {
         // Draw label text
         ctx.fillStyle = 'white';
         ctx.font = '14px Arial';
-        const label = layout.deviceId === 'screen' ? 'Layar' : layout.label;
-        ctx.fillText(label, x + 10, y + 20);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(label, x + 10, y + 8);
       } catch (error) {
         console.error(`Error drawing ${layout.deviceId}:`, error);
+        // Draw error placeholder
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.2)';
+        ctx.fillRect(x, y, width, height);
+        ctx.fillStyle = '#ef4444';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('Error loading video', x + width / 2, y + height / 2);
       }
     });
-  }, [layouts, videoElements, screenVideoElement]);
+  }, [layouts, videoElements, screenVideoElement]); // Note: We also use refs directly in the function for real-time access
+
+  // Sync video elements from ref to state periodically
+  useEffect(() => {
+    const syncInterval = setInterval(() => {
+      // Update state from refs to ensure drawCanvas has latest video elements
+      setVideoElements({ ...videoElementsRef.current });
+      if (screenVideoRef.current) {
+        setScreenVideoElement(screenVideoRef.current);
+      }
+    }, 500); // Sync every 500ms
+
+    return () => clearInterval(syncInterval);
+  }, []);
 
   // Update canvas with interval
   useEffect(() => {
@@ -549,8 +652,10 @@ useEffect(() => {
           position: 'relative', 
           width: '100%', 
           aspectRatio: '16/9',
-          backgroundColor: '#000',
-          overflow: 'hidden'
+          background: 'linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%)',
+          overflow: 'hidden',
+          border: '2px solid #e5e7eb',
+          borderRadius: '8px'
         }}
       >
         {/* Canvas for video preview */}
