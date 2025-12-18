@@ -113,8 +113,8 @@ const AdminPanel: React.FC = () => {
     }, 120);
   };
 
-  // Jika streaming aktif, sembunyikan sidebar dan top bar untuk full screen
-  const isStreamingActive = streamingState.isStreaming;
+  // Jika streaming atau recording aktif, sembunyikan sidebar dan top bar untuk full screen
+  const isStreamingActive = streamingState.isStreaming || streamingState.isRecording || streamingState.isScreenRecording;
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden" }}>

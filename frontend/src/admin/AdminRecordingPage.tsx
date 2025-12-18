@@ -178,6 +178,24 @@ const AdminRecordingPage: React.FC = () => {
   const [currentRecordingTime, setCurrentRecordingTime] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
+  // 🔴 WAJIB: reset video element saat recording berhenti
+useEffect(() => {
+  if (
+    !streamingState.isRecording &&
+    !streamingState.isScreenRecording
+  ) {
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.srcObject = null;
+      videoRef.current.removeAttribute("src");
+      videoRef.current.load();
+    }
+  }
+}, [
+  streamingState.isRecording,
+  streamingState.isScreenRecording,
+]);
+
 
   // Responsive listener
   useEffect(() => {
@@ -808,13 +826,11 @@ const AdminRecordingPage: React.FC = () => {
             }}
           >
             <button
-              onClick={() =>
-                handlePreviewVideo(
-                  finishedRecordingData.videoBlob ||
-                    streamingState.videoBlob,
-                  finishedRecordingData.videoUrl ||
-                    streamingState.videoUrl
-                )
+               onClick={() =>
+    handlePreviewVideo(
+      streamingState.videoBlob ?? finishedRecordingData?.videoBlob,
+      streamingState.videoUrl ?? finishedRecordingData?.videoUrl
+    )
               }
               style={{
                 padding: "12px 20px",
@@ -890,6 +906,214 @@ const AdminRecordingPage: React.FC = () => {
           </div>
         </div>
       </div>
+    );
+  }
+
+  // ================= RECORDING FULLSCREEN MODE =================
+  if (streamingState.isRecording || streamingState.isScreenRecording) {
+    return (
+      <>
+        <style>{`
+          @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+          }
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+          }
+        `}</style>
+
+        {/* ROOT FULLSCREEN WRAPPER */}
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            display: "flex",
+            flexDirection: "column",
+            background: "#ffffff",
+            fontFamily: '"Roboto", "Arial", sans-serif',
+            color: "#000000",
+            zIndex: 1,
+          }}
+        >
+          {/* ================= HEADER (FIXED) ================= */}
+          <div
+            style={{
+              height: "56px",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "0 16px",
+              borderBottom: "1px solid rgba(0, 0, 0, 0.1)",
+              background: "#ffffff",
+              zIndex: 10,
+            }}
+          >
+            {/* Left */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+              <img
+                src="/assets/umalo.png"
+                alt="Umalo"
+                style={{ height: "40px", objectFit: "contain" }}
+              />
+            </div>
+
+            {/* Right - REC badge */}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "6px 12px",
+                  background: "rgba(239, 68, 68, 0.2)",
+                  borderRadius: "20px",
+                  border: "1px solid rgba(239, 68, 68, 0.5)",
+                }}
+              >
+                <div
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    background: COLORS.accent,
+                    animation: "blink 1s infinite",
+                  }}
+                />
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "#ffffff",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  REC
+                </span>
+              </div>
+
+              {/* Timer */}
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#000000",
+                  fontFamily: "monospace",
+                  padding: "6px 12px",
+                  background: "rgba(0, 0, 0, 0.05)",
+                  borderRadius: "4px",
+                }}
+              >
+                {Math.floor(currentRecordingTime / 60)
+                  .toString()
+                  .padStart(2, "0")}
+                :
+                {(currentRecordingTime % 60)
+                  .toString()
+                  .padStart(2, "0")}
+              </div>
+
+              {/* Stop Button */}
+              <button
+                onClick={handleStopRecording}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  padding: "8px 16px",
+                  background: COLORS.accent,
+                  color: COLORS.white,
+                  border: "none",
+                  borderRadius: "4px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  transition: "all 0.2s ease",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = COLORS.accentDark;
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = COLORS.accent;
+                }}
+              >
+                <AnimatedDot />
+                Stop Recording
+              </button>
+            </div>
+          </div>
+
+          {/* ================= VIDEO CONTAINER ================= */}
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              position: "relative",
+              overflow: "hidden",
+              background: "#ffffff",
+            }}
+          >
+            {streamingState.recordingStream ? (
+              <video
+                key={streamingState.recordingStartTime}
+                ref={(el) => {
+                  videoRef.current = el;
+                  if (el && streamingState.recordingStream) {
+                    (el as any).srcObject = streamingState.recordingStream;
+                  }
+                }}
+                autoPlay
+                muted
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "16px",
+                  color: "#000000",
+                }}
+              >
+                <div
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: "50%",
+                    background: "rgba(0, 0, 0, 0.05)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    animation: "pulse 2s infinite",
+                  }}
+                >
+                  <i className="fas fa-video" style={{ fontSize: 24 }} />
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 500 }}>
+                  Menunggu video stream...
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </>
     );
   }
 

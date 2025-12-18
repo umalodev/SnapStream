@@ -38,6 +38,8 @@ const BasicLayoutEditor: React.FC<BasicLayoutEditorProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const lastLayoutRef = useRef<string>('');
+const videoElementsRef = useRef<{ [deviceId: string]: HTMLVideoElement }>({});
+const screenVideoRef = useRef<HTMLVideoElement | null>(null);
 
   // Initialize layouts when cameras or initialLayouts change
   useEffect(() => {
@@ -113,143 +115,136 @@ const BasicLayoutEditor: React.FC<BasicLayoutEditorProps> = ({
     }
   }, [cameras.length, screenSource, initialLayouts]);
 
-  // Initialize video elements
-  useEffect(() => {
-    const initializeVideos = async () => {
-      // Clean up existing videos first
-      Object.values(videoElements).forEach(video => {
-        if (video.srcObject) {
-          const stream = video.srcObject as MediaStream;
-          stream.getTracks().forEach(track => track.stop());
-        }
-        if (video.parentNode === document.body) {
-          document.body.removeChild(video);
-        }
-      });
-      
-      // Clean up screen video
-      if (screenVideoElement) {
-        if (screenVideoElement.srcObject) {
-          const stream = screenVideoElement.srcObject as MediaStream;
-          stream.getTracks().forEach(track => track.stop());
-        }
-        if (screenVideoElement.parentNode === document.body) {
-          document.body.removeChild(screenVideoElement);
-        }
-      }
-      
-      const newVideoElements: { [deviceId: string]: HTMLVideoElement } = {};
-      
-      // Initialize camera videos
-      for (const camera of cameras) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            video: { deviceId: { exact: camera.deviceId } },
-            audio: false
-          });
-          
-          const video = document.createElement('video');
-          video.srcObject = stream;
-          video.autoplay = true;
-          video.muted = true;
-          video.style.display = 'none';
-          document.body.appendChild(video);
-          
-          newVideoElements[camera.deviceId] = video;
-        } catch (error) {
-          console.error(`Error initializing camera ${camera.deviceId}:`, error);
-        }
-      }
-      
-      // Initialize screen video if available
-      if (screenSource) {
-        try {
-          const isElectron = window.navigator.userAgent.toLowerCase().includes('electron');
-          let screenStream: MediaStream;
-          
-          if (isElectron && (window as any).electronAPI && (window as any).electronAPI.getScreenSources) {
-            // Use Electron's desktopCapturer API
-            screenStream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                // @ts-ignore - Electron specific constraint
-                mandatory: {
-                  chromeMediaSource: 'desktop',
-                  chromeMediaSourceId: screenSource.id,
-                  minWidth: 1280,
-                  maxWidth: 1920,
-                  minHeight: 720,
-                  maxHeight: 1080
-                }
-              },
-              audio: false
-            });
-          } else if (navigator.mediaDevices && 'getDisplayMedia' in navigator.mediaDevices) {
-            // Use web browser's getDisplayMedia with specific constraints based on screenSource type
-            let displayMediaOptions: any = {
-              video: {
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
-              },
-              audio: false
-            };
+  // Initialize video elements (SAFE VERSION)
+useEffect(() => {
+  let cancelled = false;
 
-            // Add specific constraints based on screenSource type
-            if (screenSource.type === 'tab') {
-              displayMediaOptions.video.displaySurface = 'browser';
-            } else if (screenSource.type === 'window') {
-              displayMediaOptions.video.displaySurface = 'window';
-            } else {
-              displayMediaOptions.video.displaySurface = 'monitor';
-            }
+  const cameraIds = cameras.map(c => c.deviceId).join(',');
+  const screenId = screenSource?.id ?? '';
 
-            screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
-          } else {
-            throw new Error("Screen recording tidak didukung di browser ini");
-          }
-          
-          const screenVideo = document.createElement('video');
-          screenVideo.srcObject = screenStream;
-          screenVideo.autoplay = true;
-          screenVideo.muted = true;
-          screenVideo.style.display = 'none';
-          document.body.appendChild(screenVideo);
-          
-          setScreenVideoElement(screenVideo);
-        } catch (error) {
-          console.error(`Error initializing screen ${screenSource.id}:`, error);
-        }
+  const initializeVideos = async () => {
+    // ===== CLEANUP SEBELUM INIT =====
+    Object.values(videoElementsRef.current).forEach(video => {
+      if (video.srcObject) {
+        (video.srcObject as MediaStream).getTracks().forEach(t => t.stop());
       }
-      
-      setVideoElements(newVideoElements);
-    };
+      video.remove();
+    });
+    videoElementsRef.current = {};
 
-    if (cameras.length > 0 || screenSource) {
-      initializeVideos();
+    if (screenVideoRef.current) {
+      if (screenVideoRef.current.srcObject) {
+        (screenVideoRef.current.srcObject as MediaStream)
+          .getTracks()
+          .forEach(t => t.stop());
+      }
+      screenVideoRef.current.remove();
+      screenVideoRef.current = null;
     }
 
-    // Cleanup
-    return () => {
-      Object.values(videoElements).forEach(video => {
-        if (video.srcObject) {
-          const stream = video.srcObject as MediaStream;
-          stream.getTracks().forEach(track => track.stop());
+    // ===== INIT CAMERA STREAMS =====
+    for (const camera of cameras) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { deviceId: { exact: camera.deviceId } },
+          audio: false
+        });
+
+        if (cancelled) {
+          stream.getTracks().forEach(t => t.stop());
+          return;
         }
-        if (video.parentNode === document.body) {
-          document.body.removeChild(video);
-        }
-      });
-      
-      if (screenVideoElement) {
-        if (screenVideoElement.srcObject) {
-          const stream = screenVideoElement.srcObject as MediaStream;
-          stream.getTracks().forEach(track => track.stop());
-        }
-        if (screenVideoElement.parentNode === document.body) {
-          document.body.removeChild(screenVideoElement);
-        }
+
+        const video = document.createElement('video');
+        video.srcObject = stream;
+        video.autoplay = true;
+        video.muted = true;
+        video.playsInline = true;
+        video.style.display = 'none';
+        document.body.appendChild(video);
+
+        videoElementsRef.current[camera.deviceId] = video;
+      } catch (err) {
+        console.error(`Camera init failed: ${camera.deviceId}`, err);
       }
-    };
-  }, [cameras.length, screenSource]);
+    }
+
+    // ===== INIT SCREEN STREAM =====
+    if (screenSource) {
+      try {
+        let screenStream: MediaStream;
+
+        const isElectron = navigator.userAgent.toLowerCase().includes('electron');
+
+        if (isElectron && (window as any).electronAPI) {
+          screenStream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              // @ts-ignore electron constraint
+              mandatory: {
+                chromeMediaSource: 'desktop',
+                chromeMediaSourceId: screenSource.id
+              }
+            },
+            audio: false
+          });
+        } else {
+          screenStream = await navigator.mediaDevices.getDisplayMedia({
+            video: { frameRate: 30 },
+            audio: false
+          });
+        }
+
+        if (cancelled) {
+          screenStream.getTracks().forEach(t => t.stop());
+          return;
+        }
+
+        const screenVideo = document.createElement('video');
+        screenVideo.srcObject = screenStream;
+        screenVideo.autoplay = true;
+        screenVideo.muted = true;
+        screenVideo.playsInline = true;
+        screenVideo.style.display = 'none';
+        document.body.appendChild(screenVideo);
+
+        screenVideoRef.current = screenVideo;
+      } catch (err) {
+        console.error('Screen init failed', err);
+      }
+    }
+  };
+
+  if (cameras.length > 0 || screenSource) {
+    initializeVideos();
+  }
+
+  // ===== CLEANUP ON UNMOUNT / CHANGE =====
+  return () => {
+    cancelled = true;
+
+    Object.values(videoElementsRef.current).forEach(video => {
+      if (video.srcObject) {
+        (video.srcObject as MediaStream).getTracks().forEach(t => t.stop());
+      }
+      video.remove();
+    });
+    videoElementsRef.current = {};
+
+    if (screenVideoRef.current) {
+      if (screenVideoRef.current.srcObject) {
+        (screenVideoRef.current.srcObject as MediaStream)
+          .getTracks()
+          .forEach(t => t.stop());
+      }
+      screenVideoRef.current.remove();
+      screenVideoRef.current = null;
+    }
+  };
+}, [
+  cameras.map(c => c.deviceId).join(','), // ✅ STABLE
+  screenSource?.id                         // ✅ STABLE
+]);
+
 
   // Draw canvas
   const drawCanvas = useCallback(() => {
@@ -316,20 +311,17 @@ const BasicLayoutEditor: React.FC<BasicLayoutEditorProps> = ({
 
   // Notify parent only when layouts actually change
   useEffect(() => {
-    if (layouts.length > 0) {
-      const layoutString = JSON.stringify(layouts);
-      // Only call onLayoutChange if layout actually changed
-      if (lastLayoutRef.current !== layoutString) {
-        lastLayoutRef.current = layoutString;
-        // Use setTimeout to prevent setState during render
-        setTimeout(() => {
-          onLayoutChange(layouts);
-        }, 0);
-        // Auto-save to localStorage when layout changes
-        localStorage.setItem('cameraLayout', layoutString);
-      }
-    }
-  }, [layouts.length]); // Only depend on length to prevent infinite loop
+  if (layouts.length === 0) return;
+
+  const layoutString = JSON.stringify(layouts);
+
+  if (lastLayoutRef.current === layoutString) return;
+
+  lastLayoutRef.current = layoutString;
+
+  onLayoutChange(layouts);
+}, [layouts, onLayoutChange]);
+
 
   // Mouse event handlers
   const handleMouseDown = (e: React.MouseEvent, itemId: string, action: 'drag' | 'resize') => {

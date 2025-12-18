@@ -1195,23 +1195,39 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
   };
 
   const stopRecording = () => {
-    if (streamingState.mediaRecorder && streamingState.mediaRecorder.state === 'recording') {
-      streamingState.mediaRecorder.stop();
-    }
-    
-    if (streamingState.recordingStream) {
-      streamingState.recordingStream.getTracks().forEach(track => track.stop());
-    }
+  // 1️⃣ Stop MediaRecorder
+  if (
+    streamingState.mediaRecorder &&
+    streamingState.mediaRecorder.state === "recording"
+  ) {
+    streamingState.mediaRecorder.stop();
+  }
 
-    setStreamingState(prev => ({
-      ...prev,
-      isRecording: false,
-      isScreenRecording: false,
-      recordingStream: null,
-      mediaRecorder: null,
-      status: 'Recording dihentikan'
-    }));
-  };
+  // 2️⃣ Stop semua track MediaStream
+  if (streamingState.recordingStream) {
+    streamingState.recordingStream
+      .getTracks()
+      .forEach(track => track.stop());
+  }
+
+  // 3️⃣ RESET SEMUA STATE VIDEO (WAJIB)
+  setStreamingState(prev => ({
+    ...prev,
+    isRecording: false,
+    isScreenRecording: false,
+    recordingStream: null,
+    mediaRecorder: null,
+
+    // 🔴 PENTING (INI YANG HILANG SEBELUMNYA)
+    videoBlob: null,
+    videoUrl: null,
+    recordingStartTime: null,
+    recordingDuration: 0,
+
+    status: "Recording dihentikan"
+  }));
+};
+
 
   const uploadRecording = async () => {
     if (!streamingState.videoBlob) return;

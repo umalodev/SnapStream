@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef} from 'react';
 import { FaTh, FaSquare, FaColumns, FaCheck, FaTimes, FaRedo, FaStar, FaVideo, FaPlay, FaCamera, FaTimes as FaClose, FaArrowsAlt, FaDesktop } from 'react-icons/fa';
 import BasicLayoutEditor from './BasicLayoutEditor';
 
@@ -51,6 +51,9 @@ const MultiCameraRecorder: React.FC<MultiCameraRecorderProps> = ({
   const [availableScreens, setAvailableScreens] = useState<ScreenSource[]>([]);
   const [selectedScreen, setSelectedScreen] = useState<ScreenSource | null>(null);
   const [isLoadingScreens, setIsLoadingScreens] = useState(false);
+  // Guard agar init hanya jalan sekali (hindari spam)
+const initializedRef = useRef(false);
+
 
   // Detect available cameras
   const getAvailableCameras = useCallback(async () => {
@@ -83,7 +86,8 @@ const MultiCameraRecorder: React.FC<MultiCameraRecorderProps> = ({
     } finally {
       setIsLoadingCameras(false);
     }
-  }, [onStatusUpdate]);
+  }, [onStatusUpdate, isLoadingCameras]);
+
 
   // Detect available screen sources
   const getAvailableScreens = useCallback(async () => {
@@ -150,14 +154,12 @@ const MultiCameraRecorder: React.FC<MultiCameraRecorderProps> = ({
       onStatusUpdate(`${newSelected.length} kamera dipilih`);
       return newSelected;
     });
-  }, [onStatusUpdate]);
+}, [onStatusUpdate, isLoadingScreens]);
 
   // Handle custom layout change
-  const handleLayoutChange = useCallback((layouts: CameraLayout[]) => {
-    setCustomLayouts(layouts);
-    // Also update savedLayouts so it reflects the current state
-    setSavedLayouts(layouts);
-  }, []);
+ const handleLayoutChange = useCallback((layouts: CameraLayout[]) => {
+  setCustomLayouts(layouts);
+}, []);
 
   // Start recording
   const handleStartRecording = () => {
@@ -200,7 +202,15 @@ const MultiCameraRecorder: React.FC<MultiCameraRecorderProps> = ({
       includeScreenRecording && selectedScreen ? selectedScreen : undefined
     );
   };
+    const closeLayoutEditor = useCallback(() => {
+    setShowLayoutEditor(false);
+  }, []);
 
+  const filteredCameras = useMemo(() => {
+    return availableCameras.filter(camera =>
+      selectedCameras.includes(camera.deviceId)
+    );
+  }, [availableCameras, selectedCameras]);
   // Load saved layout on mount and when modal opens
   useEffect(() => {
     const savedLayout = localStorage.getItem('cameraLayout');
@@ -219,10 +229,13 @@ const MultiCameraRecorder: React.FC<MultiCameraRecorderProps> = ({
   }, [layoutType, showLayoutEditor]);
 
   // Initialize cameras and screens on mount
-  useEffect(() => {
-    getAvailableCameras();
-    getAvailableScreens();
-  }, [getAvailableCameras, getAvailableScreens]); // Include both functions in dependencies
+ useEffect(() => {
+  if (initializedRef.current) return;
+  initializedRef.current = true;
+
+  getAvailableCameras();
+  getAvailableScreens();
+}, [getAvailableCameras, getAvailableScreens]);
 
   return (
     <>
@@ -849,19 +862,14 @@ const MultiCameraRecorder: React.FC<MultiCameraRecorderProps> = ({
           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
           border: '1px solid #e5e7eb'
         }}>
-          <BasicLayoutEditor
-            cameras={(() => {
-              const filteredCameras = availableCameras.filter(camera => selectedCameras.includes(camera.deviceId));
-              console.log('MultiCameraRecorder: selectedCameras:', selectedCameras);
-              console.log('MultiCameraRecorder: availableCameras:', availableCameras);
-              console.log('MultiCameraRecorder: filteredCameras:', filteredCameras);
-              return filteredCameras;
-            })()}
-            onLayoutChange={handleLayoutChange}
-            onClose={() => setShowLayoutEditor(false)}
-            initialLayouts={savedLayouts}
-            screenSource={includeScreenRecording && selectedScreen ? selectedScreen : undefined}
-          />
+         <BasicLayoutEditor
+  cameras={filteredCameras}
+  onLayoutChange={handleLayoutChange}
+  onClose={closeLayoutEditor}
+  initialLayouts={savedLayouts}
+  screenSource={includeScreenRecording && selectedScreen ? selectedScreen : undefined}
+/>
+
         </div>
       </div>
     )}
