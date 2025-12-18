@@ -635,18 +635,7 @@ const MultiCameraStreamer: React.FC<MultiCameraStreamerProps> = ({
                 </button>
               </div>
               
-              {(savedLayouts.length > 0 || customLayouts.length > 0) && (
-                <div style={{ 
-                  padding: '8px 12px', 
-                  backgroundColor: '#f0f9ff', 
-                  border: '1px solid #0ea5e9', 
-                  borderRadius: '4px',
-                  fontSize: '12px',
-                  color: '#0369a1'
-                }}>
-                  Layout tersimpan tersedia ({customLayouts.length > 0 ? customLayouts.length : savedLayouts.length} kamera)
-                </div>
-              )}
+   
             </div>
           )}
         </div>
