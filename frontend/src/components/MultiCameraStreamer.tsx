@@ -633,34 +633,6 @@ const MultiCameraStreamer: React.FC<MultiCameraStreamerProps> = ({
                   <FaArrowsAlt style={{ fontSize: '12px' }} />
                   Atur Layout
                 </button>
-                
-                {(savedLayouts.length > 0 || customLayouts.length > 0) && (
-                  <button
-                    onClick={() => {
-                      const layoutToLoad = customLayouts.length > 0 ? customLayouts : savedLayouts;
-                      setCustomLayouts(layoutToLoad);
-                      onStatusUpdate('Layout tersimpan telah dimuat!');
-                    }}
-                    style={{ 
-                      display: 'flex', 
-                      alignItems: 'center', 
-                      gap: '8px', 
-                      padding: '12px 16px', 
-                      borderRadius: '6px', 
-                      fontSize: '12px', 
-                      fontWeight: '500',
-                      backgroundColor: '#10b981',
-                      color: 'white',
-                      border: 'none',
-                      cursor: 'pointer',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
-                  >
-                    💾 Muat Layout
-                  </button>
-                )}
               </div>
               
               {(savedLayouts.length > 0 || customLayouts.length > 0) && (

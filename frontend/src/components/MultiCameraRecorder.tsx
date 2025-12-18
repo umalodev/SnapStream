@@ -720,34 +720,6 @@ const initializedRef = useRef(false);
                 <FaArrowsAlt style={{ fontSize: '14px' }} />
                 Atur Layout
               </button>
-              
-              {(savedLayouts.length > 0 || customLayouts.length > 0) && (
-                <button
-                  onClick={() => {
-                    const layoutToLoad = customLayouts.length > 0 ? customLayouts : savedLayouts;
-                    setCustomLayouts(layoutToLoad);
-                    setTimeout(() => onStatusUpdate('Layout tersimpan telah dimuat!'), 0);
-                  }}
-                  style={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    gap: '8px', 
-                    padding: '12px 16px', 
-                    borderRadius: '6px', 
-                    fontSize: '14px', 
-                    fontWeight: '500',
-                    backgroundColor: '#10b981',
-                    color: 'white',
-                    border: 'none',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
-                >
-                  💾 Muat Layout
-                </button>
-              )}
             </div>
             
             {(savedLayouts.length > 0 || customLayouts.length > 0) && (
