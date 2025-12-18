@@ -107,7 +107,7 @@ export const StreamingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [streamingLayoutVersion]);
 
   useEffect(() => {
-    socket.current = io('http://192.168.1.37:4000');
+    socket.current = io('http://192.168.1.10:4000');
     return () => {
       if (socket.current) {
         socket.current.disconnect();
@@ -1025,7 +1025,7 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
       }
 
       // Check if we're in a secure context (HTTPS or localhost)
-      if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '192.168.1.37') {
+      if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '192.168.1.10') {
         throw new Error("Screen recording memerlukan koneksi HTTPS atau localhost untuk keamanan.");
       }
 

@@ -290,21 +290,89 @@ ipcMain.on('preload-crashed', (_event, error) => {
 });
 
 ipcMain.handle('get-screen-sources', async () => {
+  // Suppress WGC errors from stderr temporarily
+  const originalStderrWrite = process.stderr.write.bind(process.stderr);
+  let stderrRestored = false;
+  
+  process.stderr.write = function(chunk: any, encoding?: any, callback?: any): boolean {
+    const message = chunk?.toString() || '';
+    // Filter out WGC capturer errors - these are non-fatal
+    if (message.includes('wgc_capturer_win.cc') && message.includes('Source is not capturable')) {
+      // Silently ignore
+      if (callback) callback();
+      return true;
+    }
+    // Allow other errors through
+    return originalStderrWrite(chunk, encoding, callback);
+  };
+  
   try {
     console.log("[main] Getting screen sources...");
+    
+    // Get sources with error handling
+    // Note: WGC errors in console are non-fatal and are now suppressed
     const sources = await desktopCapturer.getSources({
       types: ['screen', 'window'],
-      thumbnailSize: { width: 150, height: 150 }
+      thumbnailSize: { width: 150, height: 150 },
+      fetchWindowIcons: false // Disable window icons to reduce errors
     });
-    console.log("[main] Found screen sources:", sources.length);
-    return sources.map(source => ({
-      id: source.id,
-      name: source.name,
-      thumbnail: source.thumbnail.toDataURL()
-    }));
+    
+    // Restore original stderr
+    process.stderr.write = originalStderrWrite;
+    stderrRestored = true;
+    
+    // Filter out invalid sources and validate each one
+    const validSources = sources.filter(source => {
+      try {
+        // Validate source has required properties
+        if (!source.id || !source.name) {
+          return false;
+        }
+        
+        // Skip sources with empty or invalid thumbnails
+        if (!source.thumbnail || source.thumbnail.isEmpty()) {
+          return false;
+        }
+        
+        // Additional validation: check if source name is not empty
+        if (source.name.trim().length === 0) {
+          return false;
+        }
+        
+        return true;
+      } catch (e) {
+        // If validation fails, exclude this source
+        // This helps filter out sources that cause WGC errors
+        return false;
+      }
+    });
+    
+    console.log(`[main] Found ${validSources.length} valid screen sources (filtered ${sources.length - validSources.length} invalid)`);
+    
+    return validSources.map(source => {
+      try {
+        return {
+          id: source.id,
+          name: source.name,
+          thumbnail: source.thumbnail.toDataURL()
+        };
+      } catch (e) {
+        // If thumbnail conversion fails, return source without thumbnail
+        return {
+          id: source.id,
+          name: source.name,
+          thumbnail: ''
+        };
+      }
+    });
   } catch (error) {
+    // Restore original stderr on error if not already restored
+    if (!stderrRestored) {
+      process.stderr.write = originalStderrWrite;
+    }
     console.error("[main] Error getting screen sources:", error);
-    throw error;
+    // Return empty array instead of throwing to prevent app crash
+    return [];
   }
 });
 
@@ -319,6 +387,11 @@ ipcMain.handle('open-external', async (event, url) => {
     throw error;
   }
 });
+
+// Suppress non-fatal WGC (Windows Graphics Capture) errors
+// These errors occur when some sources cannot be captured but are non-fatal
+// We filter invalid sources in get-screen-sources handler instead
+app.commandLine.appendSwitch('disable-dev-shm-usage');
 
 app.whenReady().then(() => {
   console.log("=== APP STARTING ===");

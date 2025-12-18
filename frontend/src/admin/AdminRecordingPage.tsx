@@ -178,23 +178,39 @@ const AdminRecordingPage: React.FC = () => {
   const [currentRecordingTime, setCurrentRecordingTime] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  // 🔴 WAJIB: reset video element saat recording berhenti
-useEffect(() => {
-  if (
-    !streamingState.isRecording &&
-    !streamingState.isScreenRecording
-  ) {
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.srcObject = null;
-      videoRef.current.removeAttribute("src");
-      videoRef.current.load();
+  
+  // Set srcObject only when recordingStream changes (prevents flicker)
+  // This prevents the video from flickering by avoiding unnecessary srcObject resets
+  useEffect(() => {
+    if (!videoRef.current) return;
+    
+    // Only update srcObject when we have a stream and it's different
+    // This prevents flicker caused by setting the same stream repeatedly
+    if (streamingState.recordingStream) {
+      if (videoRef.current.srcObject !== streamingState.recordingStream) {
+        videoRef.current.srcObject = streamingState.recordingStream;
+      }
     }
-  }
-}, [
-  streamingState.isRecording,
-  streamingState.isScreenRecording,
-]);
+    // Don't clear srcObject here - let the cleanup useEffect handle it when recording stops
+  }, [streamingState.recordingStream]);
+  
+  // 🔴 WAJIB: reset video element saat recording berhenti
+  useEffect(() => {
+    if (
+      !streamingState.isRecording &&
+      !streamingState.isScreenRecording
+    ) {
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+        videoRef.current.removeAttribute("src");
+        videoRef.current.load();
+      }
+    }
+  }, [
+    streamingState.isRecording,
+    streamingState.isScreenRecording,
+  ]);
 
 
   // Responsive listener
@@ -1068,9 +1084,7 @@ useEffect(() => {
                 key={streamingState.recordingStartTime}
                 ref={(el) => {
                   videoRef.current = el;
-                  if (el && streamingState.recordingStream) {
-                    (el as any).srcObject = streamingState.recordingStream;
-                  }
+                  // Don't set srcObject here - use useEffect instead to prevent flicker
                 }}
                 autoPlay
                 muted
@@ -1563,10 +1577,8 @@ useEffect(() => {
                   >
                    <video
   ref={(el) => {
-    videoRef.current = el; // simpan ke videoRef
-    if (el && streamingState.recordingStream) {
-      (el as any).srcObject = streamingState.recordingStream;
-    }
+    videoRef.current = el;
+    // Don't set srcObject here - use useEffect instead to prevent flicker
   }}
   autoPlay
   muted

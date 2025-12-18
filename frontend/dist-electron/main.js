@@ -240,21 +240,64 @@ ipcMain.on("preload-crashed", (_event, error) => {
   console.error("[main] PRELOAD CRASHED:", error);
 });
 ipcMain.handle("get-screen-sources", async () => {
+  const originalStderrWrite = process.stderr.write.bind(process.stderr);
+  let stderrRestored = false;
+  process.stderr.write = function(chunk, encoding, callback) {
+    const message = chunk?.toString() || "";
+    if (message.includes("wgc_capturer_win.cc") && message.includes("Source is not capturable")) {
+      if (callback) callback();
+      return true;
+    }
+    return originalStderrWrite(chunk, encoding, callback);
+  };
   try {
     console.log("[main] Getting screen sources...");
     const sources = await desktopCapturer.getSources({
       types: ["screen", "window"],
-      thumbnailSize: { width: 150, height: 150 }
+      thumbnailSize: { width: 150, height: 150 },
+      fetchWindowIcons: false
+      // Disable window icons to reduce errors
     });
-    console.log("[main] Found screen sources:", sources.length);
-    return sources.map((source) => ({
-      id: source.id,
-      name: source.name,
-      thumbnail: source.thumbnail.toDataURL()
-    }));
+    process.stderr.write = originalStderrWrite;
+    stderrRestored = true;
+    const validSources = sources.filter((source) => {
+      try {
+        if (!source.id || !source.name) {
+          return false;
+        }
+        if (!source.thumbnail || source.thumbnail.isEmpty()) {
+          return false;
+        }
+        if (source.name.trim().length === 0) {
+          return false;
+        }
+        return true;
+      } catch (e) {
+        return false;
+      }
+    });
+    console.log(`[main] Found ${validSources.length} valid screen sources (filtered ${sources.length - validSources.length} invalid)`);
+    return validSources.map((source) => {
+      try {
+        return {
+          id: source.id,
+          name: source.name,
+          thumbnail: source.thumbnail.toDataURL()
+        };
+      } catch (e) {
+        return {
+          id: source.id,
+          name: source.name,
+          thumbnail: ""
+        };
+      }
+    });
   } catch (error) {
+    if (!stderrRestored) {
+      process.stderr.write = originalStderrWrite;
+    }
     console.error("[main] Error getting screen sources:", error);
-    throw error;
+    return [];
   }
 });
 ipcMain.handle("open-external", async (event, url) => {
@@ -268,6 +311,7 @@ ipcMain.handle("open-external", async (event, url) => {
     throw error;
   }
 });
+app.commandLine.appendSwitch("disable-dev-shm-usage");
 app.whenReady().then(() => {
   console.log("=== APP STARTING ===");
   createWindow();
