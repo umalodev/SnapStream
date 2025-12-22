@@ -21,7 +21,7 @@ class SimpleYouTube {
   // Get available MediaSoup rooms
   async getAvailableRooms() {
     try {
-      const response = await fetch('http://192.168.1.10:4000/debug/producers');
+      const response = await fetch('http://192.168.1.37:4000/debug/producers');
       if (response.ok) {
         const data = await response.json();
         return data.availableRooms || [];

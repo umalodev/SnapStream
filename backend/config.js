@@ -6,7 +6,7 @@ module.exports = {
   // Server Configuration
   PORT: process.env.PORT || 3000,
   NODE_ENV: process.env.NODE_ENV || 'development',
-  HOST: process.env.HOST || (isDev ? '192.168.1.10' : '0.0.0.0'),
+  HOST: process.env.HOST || (isDev ? '192.168.1.37' : '0.0.0.0'),
 
   // Database Configuration
   DB_HOST: process.env.DB_HOST || 'localhost',
@@ -26,8 +26,8 @@ module.exports = {
 
   // Media Server
   MEDIA_PORT: process.env.MEDIA_PORT || 8000,
-  MEDIA_HOST: process.env.MEDIA_HOST || (isDev ? '192.168.1.10' : '0.0.0.0'),
+  MEDIA_HOST: process.env.MEDIA_HOST || (isDev ? '192.168.1.37' : '0.0.0.0'),
 
   // CORS Configuration
-  CORS_ORIGIN: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : (isDev ? ['http://192.168.1.10:5173', 'http://192.168.1.10:3000', 'http://localhost:5173', 'http://localhost:3000'] : ['http://192.168.1.10:3000', 'http://localhost:3000']),
+  CORS_ORIGIN: process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : (isDev ? ['http://192.168.1.37:5173', 'http://192.168.1.37:3000', 'http://localhost:5173', 'http://localhost:3000'] : ['http://192.168.1.37:3000', 'http://localhost:3000']),
 }; 

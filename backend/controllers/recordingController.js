@@ -60,7 +60,7 @@ exports.listRecordings = async (req, res) => {
         judul: rec.judul,
         duration: rec.duration || 0,
         uploadedAt: rec.uploadedAt,
-        url: `http://192.168.1.10:3000/api/recording/stream/${rec.filename}`,
+        url: `http://192.168.1.37:3000/api/recording/stream/${rec.filename}`,
         tanggal: uploadedDate.toLocaleDateString('id-ID', {
           year: 'numeric',
           month: 'long',

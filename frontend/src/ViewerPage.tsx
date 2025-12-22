@@ -72,7 +72,7 @@ const ViewerPage: React.FC = () => {
 
     // Initialize chat socket connection
     if (streamId && !chatSocketRef.current) {
-      chatSocketRef.current = io('http://192.168.1.10:4000');
+      chatSocketRef.current = io('http://192.168.1.37:4000');
       console.log('[ViewerPage] Chat socket initialized for stream:', streamId);
     }
 
@@ -319,7 +319,7 @@ const ViewerPage: React.FC = () => {
         setError('Timeout terhubung ke live stream. Pastikan admin sedang streaming dan coba lagi.');
       }, 10000);
       
-      socketRef.current = io('http://192.168.1.10:4000');
+      socketRef.current = io('http://192.168.1.37:4000');
       
       socketRef.current.on('connect', async () => {
         console.log('Connected to MediaSoup server');
