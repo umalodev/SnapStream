@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 const isDev = !app.isPackaged;
 
 // ✅ ROOT yang benar (dev: .../app, prod: resourcesPath)
-const ROOT = isDev ? path.join(__dirname, "..") : process.resourcesPath;
+const ROOT = isDev ? path.join(__dirname, "..") : app.getAppPath();
 
 // ✅ dist yang benar (tanpa "app" dobel)
 const DIST = path.join(ROOT, "dist");
@@ -62,7 +62,6 @@ win.webContents.on("before-input-event", (event, input) => {
     }
   }
 });
- // ✅ FIX: HTML5 video fullscreen button (ikon fullscreen di player)
   win.webContents.on("enter-html-full-screen", () => {
     win?.setFullScreen(true);
   });
@@ -72,10 +71,12 @@ win.webContents.on("before-input-event", (event, input) => {
   });
 
 
-  // ✅ (opsional tapi membantu)
-  win.webContents.session.setPermissionRequestHandler((wc, permission, callback) => {
-    callback(permission === "media" || permission === "display-capture");
+  win.webContents.session.setPermissionRequestHandler((_wc, permission, callback) => {
+    console.log("[permission]", permission);
+    const allowed = ["media", "display-capture", "fullscreen"];
+    callback(allowed.includes(permission));
   });
+
 
   if (isDev) {
     win.loadURL("http://localhost:5173");

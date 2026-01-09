@@ -1,117 +1,73 @@
-import { app, ipcMain, desktopCapturer, clipboard, BrowserWindow } from "electron";
-import path from "node:path";
-import fs from "node:fs";
-import { fileURLToPath } from "node:url";
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const isDev = !app.isPackaged;
-const ROOT = isDev ? path.join(__dirname, "..") : process.resourcesPath;
-const DIST = path.join(ROOT, "dist");
-const DIST_ELECTRON = path.join(ROOT, "dist-electron");
-console.log("[ROOT]", ROOT);
-console.log("[DIST]", DIST);
-console.log("[DIST_ELECTRON]", DIST_ELECTRON);
-function resolvePreload() {
-  const paths = [
-    path.join(DIST_ELECTRON, "preload.cjs"),
-    path.join(DIST_ELECTRON, "preload.js")
-  ];
-  const found = paths.find((f) => fs.existsSync(f));
-  console.log("[PRELOAD FOUND]", found);
-  if (!found) throw new Error("Preload file NOT found in dist-electron!");
-  return found;
+import { app as r, ipcMain as s, desktopCapturer as p, clipboard as h, BrowserWindow as m } from "electron";
+import o from "node:path";
+import S from "node:fs";
+import { fileURLToPath as F } from "node:url";
+const g = F(import.meta.url), y = o.dirname(g), f = !r.isPackaged, u = f ? o.join(y, "..") : r.getAppPath(), w = o.join(u, "dist"), c = o.join(u, "dist-electron");
+console.log("[ROOT]", u);
+console.log("[DIST]", w);
+console.log("[DIST_ELECTRON]", c);
+function T() {
+  const n = [
+    o.join(c, "preload.cjs"),
+    o.join(c, "preload.js")
+  ].find((l) => S.existsSync(l));
+  if (console.log("[PRELOAD FOUND]", n), !n) throw new Error("Preload file NOT found in dist-electron!");
+  return n;
 }
-let win = null;
-function createWindow() {
-  win = new BrowserWindow({
+let e = null;
+function k() {
+  e = new m({
     width: 1280,
     height: 800,
     backgroundColor: "#111",
-    show: false,
-    fullscreenable: true,
+    show: !1,
+    fullscreenable: !0,
     // ✅ penting
     webPreferences: {
-      preload: resolvePreload(),
-      contextIsolation: true,
-      nodeIntegration: false
+      preload: T(),
+      contextIsolation: !0,
+      nodeIntegration: !1
     }
-  });
-  win.webContents.on("before-input-event", (event, input) => {
-    if (input.type !== "keyDown") return;
-    if (input.key === "F11") {
-      event.preventDefault();
-      win?.setFullScreen(!win.isFullScreen());
-    }
-    if (input.key === "Escape") {
-      if (win?.isFullScreen()) {
-        event.preventDefault();
-        win.setFullScreen(false);
-      }
-    }
-  });
-  win.webContents.on("enter-html-full-screen", () => {
-    win?.setFullScreen(true);
-  });
-  win.webContents.on("leave-html-full-screen", () => {
-    win?.setFullScreen(false);
-  });
-  win.webContents.session.setPermissionRequestHandler((wc, permission, callback) => {
-    callback(permission === "media" || permission === "display-capture");
-  });
-  if (isDev) {
-    win.loadURL("http://localhost:5173");
-  } else {
-    win.loadFile(path.join(DIST, "index.html"));
-  }
-  win.once("ready-to-show", () => win?.show());
+  }), e.webContents.on("before-input-event", (t, n) => {
+    n.type === "keyDown" && (n.key === "F11" && (t.preventDefault(), e?.setFullScreen(!e.isFullScreen())), n.key === "Escape" && e?.isFullScreen() && (t.preventDefault(), e.setFullScreen(!1)));
+  }), e.webContents.on("enter-html-full-screen", () => {
+    e?.setFullScreen(!0);
+  }), e.webContents.on("leave-html-full-screen", () => {
+    e?.setFullScreen(!1);
+  }), e.webContents.session.setPermissionRequestHandler((t, n, l) => {
+    console.log("[permission]", n), l(["media", "display-capture", "fullscreen"].includes(n));
+  }), f ? e.loadURL("http://localhost:5173") : e.loadFile(o.join(w, "index.html")), e.once("ready-to-show", () => e?.show());
 }
-app.whenReady().then(() => {
-  console.log("=== SNAPSTREAM ELECTRON START ===");
-  createWindow();
+r.whenReady().then(() => {
+  console.log("=== SNAPSTREAM ELECTRON START ==="), k();
 });
-ipcMain.handle("get-screen-sources", async () => {
-  const sources = await desktopCapturer.getSources({ types: ["screen", "window"] });
-  return sources.map((s) => ({
-    id: s.id,
-    name: s.name,
-    thumbnail: s.thumbnail.toDataURL()
-  }));
+s.handle("get-screen-sources", async () => (await p.getSources({ types: ["screen", "window"] })).map((n) => ({
+  id: n.id,
+  name: n.name,
+  thumbnail: n.thumbnail.toDataURL()
+})));
+r.on("window-all-closed", () => {
+  process.platform !== "darwin" && r.quit();
 });
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
-});
-ipcMain.handle("get-viewer-count", async (_evt, roomId) => {
+s.handle("get-viewer-count", async (t, n) => {
   try {
-    const url = `http://192.168.0.34:4000/api/viewer-count/${encodeURIComponent(roomId)}`;
-    const res = await fetch(url, { method: "GET" });
-    const text = await res.text();
-    let data = null;
+    const l = `http://192.168.0.34:4000/api/viewer-count/${encodeURIComponent(n)}`, a = await fetch(l, { method: "GET" }), d = await a.text();
+    let i = null;
     try {
-      data = JSON.parse(text);
+      i = JSON.parse(d);
     } catch {
-      data = { raw: text };
+      i = { raw: d };
     }
-    return { ok: res.ok, status: res.status, data };
-  } catch (err) {
-    return { ok: false, status: 0, data: null, error: err?.message || String(err) };
+    return { ok: a.ok, status: a.status, data: i };
+  } catch (l) {
+    return { ok: !1, status: 0, data: null, error: l?.message || String(l) };
   }
 });
-ipcMain.handle("clipboard-write-text", async (_evt, text) => {
-  clipboard.writeText(String(text || ""));
-  return true;
+s.handle("clipboard-write-text", async (t, n) => (h.writeText(String(n || "")), !0));
+s.handle("window:toggle-fullscreen", async () => {
+  if (!e) return { ok: !1, isFullscreen: !1 };
+  const t = !e.isFullScreen();
+  return e.setFullScreen(t), { ok: !0, isFullscreen: t };
 });
-ipcMain.handle("window:toggle-fullscreen", async () => {
-  if (!win) return { ok: false, isFullscreen: false };
-  const next = !win.isFullScreen();
-  win.setFullScreen(next);
-  return { ok: true, isFullscreen: next };
-});
-ipcMain.handle("window:set-fullscreen", async (_evt, value) => {
-  if (!win) return { ok: false, isFullscreen: false };
-  win.setFullScreen(!!value);
-  return { ok: true, isFullscreen: win.isFullScreen() };
-});
-ipcMain.handle("window:is-fullscreen", async () => {
-  if (!win) return { ok: false, isFullscreen: false };
-  return { ok: true, isFullscreen: win.isFullScreen() };
-});
+s.handle("window:set-fullscreen", async (t, n) => e ? (e.setFullScreen(!!n), { ok: !0, isFullscreen: e.isFullScreen() }) : { ok: !1, isFullscreen: !1 });
+s.handle("window:is-fullscreen", async () => e ? { ok: !0, isFullscreen: e.isFullScreen() } : { ok: !1, isFullscreen: !1 });
