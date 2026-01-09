@@ -1,84 +1,69 @@
 {
-  "name": "recording-app",
-  "private": true,
+  "name": "snapstream",
   "version": "1.0.0",
-  "description": "Aplikasi Recording Pembelajaran dengan Electron",
+  "private": true,
+  "description": "SnapStream - Live Stream & Recording App",
   "type": "module",
+
+
+  "author": {
+    "name": "Umalo Sedia Tekno",
+    "email": "umalo@gmail.com"
+  },
+
+
+  "main": "dist-electron/main.js",
+
+
   "scripts": {
     "dev": "vite",
     "dev:electron": "vite",
-    "dev:backend": "cd ../backend && npm start",
-    "dev:media": "cd ../backend && npm run media",
-    "build": "npm run build:electron && npm run build:renderer",
-    "build:electron": "tsc -p tsconfig.electron.json",
     "build:renderer": "vite build",
+    "build:electron": "tsc -p tsconfig.electron.json",
+    "build": "npm run build:electron && npm run build:renderer",
     "build:win": "npm run build && npx electron-builder --win",
-    "build:mac": "npm run build && npx electron-builder --mac",
-    "build:linux": "npm run build && npx electron-builder --linux",
-    "build:all": "npm run build && npx electron-builder -mwl",
-    "lint": "eslint .",
     "preview": "vite preview"
   },
-  "main": "dist-electron/main.js",
-  "dependencies": {
-    "hls": "^0.0.1",
-    "hls.js": "^1.6.7",
-    "lucide-react": "^0.544.0",
-    "mediasoup-client": "^3.12.5",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-icons": "^5.5.0",
-    "react-router-dom": "^6.30.1",
-    "socket.io-client": "^4.7.5"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.30.1",
-    "@tailwindcss/postcss": "^4.1.11",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "autoprefixer": "^10.4.21",
-    "concurrently": "^8.2.2",
-    "cross-env": "^7.0.3",
-    "electron": "^30.0.1",
-    "electron-builder": "^24.13.3",
-    "eslint": "^9.30.1",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.20",
-    "globals": "^16.3.0",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.11",
-    "typescript": "~5.8.3",
-    "typescript-eslint": "^8.35.1",
-    "vite": "^7.0.4",
-    "vite-plugin-electron": "^0.28.6",
-    "vite-plugin-electron-renderer": "^0.14.5",
-    "wait-on": "^7.2.0"
-  },
-  "keywords": [
-    "electron",
-    "recording",
-    "education",
-    "react"
-  ],
-  "author": "Your Name",
-  "license": "MIT",
+
+
   "build": {
-    "appId": "com.recording.app",
-    "productName": "Recording App",
+    "asar": false,
+    "appId": "com.snapstream.app",
+    "productName": "SnapStream",
+
+
     "directories": {
-      "output": "dist"
+      "output": "release",
+      "buildResources": "resources"
     },
+
+
     "files": [
-      "dist-electron/**/*",
-      "dist/**/*"
+      "dist/**",
+      "dist-electron/**"
     ],
+
+
+    "extraResources": [
+      {
+        "from": "../backend/uploads",
+        "to": "uploads"
+      }
+    ],
+
+
     "win": {
-      "target": "nsis"
+      "target": "nsis",
+      "icon": "icon.ico",
+      "artifactName": "SnapStream-${version}-Setup.${ext}"
     },
+
+
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "shortcutName": "SnapStream"
     }
   }
 }

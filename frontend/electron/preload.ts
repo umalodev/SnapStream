@@ -13,13 +13,22 @@ try {
   const electronAPI = Object.freeze({
     isElectron: true,
     testPreload,
-    
+      // ✅ Fullscreen window controls
+  toggleFullscreen: () => ipcRenderer.invoke("window:toggle-fullscreen"),
+  setFullscreen: (value: boolean) =>
+    ipcRenderer.invoke("window:set-fullscreen", !!value),
+  isFullscreen: () => ipcRenderer.invoke("window:is-fullscreen"),
     // App info
     getAppVersion: () => ipcRenderer.invoke('get-app-version'),
     getAppPath: () => ipcRenderer.invoke('get-app-path'),
     
     // Screen recording APIs
     getScreenSources: () => ipcRenderer.invoke('get-screen-sources'),
+      writeClipboardText: (text: string) => ipcRenderer.invoke("clipboard-write-text", text),
+
+
+      getViewerCount: (roomId: string) => ipcRenderer.invoke("get-viewer-count", roomId),
+
     
     // Menu events
     onMenuNewRecording: (callback: any) => {

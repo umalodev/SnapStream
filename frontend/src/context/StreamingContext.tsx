@@ -107,7 +107,7 @@ export const StreamingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [streamingLayoutVersion]);
 
   useEffect(() => {
-    socket.current = io('http://192.168.1.37:4000');
+    socket.current = io('http://192.168.0.34:4000');
     return () => {
       if (socket.current) {
         socket.current.disconnect();
@@ -376,13 +376,14 @@ export const StreamingProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
       console.log('Producing video track...');
       videoProducerRef.current = await producerTransport.produce({
-        track: videoTrack,
-        codecOptions: {
-          videoGoogleStartBitrate: 1500, // Balanced for stability
-          videoGoogleMaxBitrate: 3000,   // Balanced for stability
-          videoGoogleMinBitrate: 500     // Lower minimum for better adaptation
-        }
-      });
+  track: videoTrack,
+  encodings: [
+    { maxBitrate: 8_000_000 } // 8 Mbps biar teks tajam
+  ],
+  codecOptions: {
+    videoGoogleStartBitrate: 4000
+  }
+});
       console.log("videoTrack produced:", videoTrack, "producerId:", videoProducerRef.current.id);
       
       // Simplified producer event listeners
@@ -1025,7 +1026,7 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
       }
 
       // Check if we're in a secure context (HTTPS or localhost)
-      if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '192.168.1.37') {
+      if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '192.168.0.34') {
         throw new Error("Screen recording memerlukan koneksi HTTPS atau localhost untuk keamanan.");
       }
 
@@ -1399,8 +1400,8 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
 
       // Create canvas for composition with optimized size for memory management
       const canvas = document.createElement('canvas');
-      canvas.width = 1280; // Optimized size for memory management
-      canvas.height = 720;  // Optimized size for memory management
+      canvas.width = 1920; // Optimized size for memory management
+      canvas.height = 1080;  // Optimized size for memory management
       const ctx = canvas.getContext('2d');
       if (!ctx) {
         throw new Error('Canvas context tidak tersedia');
@@ -1477,7 +1478,7 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Create canvas stream with optimized settings and memory management
-      const canvasStream = canvas.captureStream(15); // Reduced to 15 FPS to save memory
+      const canvasStream = canvas.captureStream(30); // Reduced to 15 FPS to save memory
       
       // Store canvas reference for cleanup
       const canvasRef = canvas;
@@ -1500,7 +1501,7 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
       // Background-compatible animation function using setInterval for recording
       let isRecordingAnimating = true;
       let recordingAnimationInterval: NodeJS.Timeout | null = null;
-      const recordingTargetFPS = 15; // Reduced to 15 FPS for screen sharing to save memory
+      const recordingTargetFPS = 30; // Reduced to 15 FPS for screen sharing to save memory
       const recordingFrameInterval = 1000 / recordingTargetFPS;
       
       // Pre-calculate active streams to avoid filtering every frame
@@ -1625,7 +1626,8 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
       };
 
 
-      const drawCustomLayout = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, layouts: any[], videos: { [deviceId: string]: HTMLVideoElement }) => {
+      const drawCustomLayout = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, layouts: any[],
+         videos: { [deviceId: string]: HTMLVideoElement }) => {
         if (layouts.length === 0) return;
 
         // Sort layouts by zIndex to draw in correct order
@@ -1797,6 +1799,50 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
       updateStatus(error.message || "Gagal memulai recording multi-kamera.");
     }
   };
+// helpers (taruh di atas file atau util)
+const isElectronReal = () =>
+  !!(window as any).electronAPI?.isElectron ||
+  window.navigator.userAgent.toLowerCase().includes("electron");
+
+const isValidDesktopId = (id?: string) =>
+  typeof id === "string" && (id.startsWith("screen:") || id.startsWith("window:"));
+
+const hasGetDisplayMedia = () =>
+  !!(navigator.mediaDevices as any)?.getDisplayMedia;
+
+function waitVideoReady(video: HTMLVideoElement, timeoutMs = 4000) {
+  return new Promise<void>((resolve) => {
+    const done = () => resolve();
+
+    // sudah siap + punya dimensi
+    if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) return done();
+
+    const onReady = () => {
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        cleanup();
+        done();
+      }
+    };
+
+    const cleanup = () => {
+      video.removeEventListener("loadedmetadata", onReady);
+      video.removeEventListener("loadeddata", onReady);
+      video.removeEventListener("canplay", onReady);
+      video.removeEventListener("playing", onReady);
+    };
+
+    video.addEventListener("loadedmetadata", onReady);
+    video.addEventListener("loadeddata", onReady);
+    video.addEventListener("canplay", onReady);
+    video.addEventListener("playing", onReady);
+
+    // fallback biar gak nge-hang
+    setTimeout(() => {
+      cleanup();
+      done();
+    }, timeoutMs);
+  });
+}
 
   const startMultiCameraStreaming = useCallback(async (
     selectedCameras: string[], 
@@ -1836,85 +1882,109 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
         }
       }
 
-      // Get screen stream if screen recording is enabled
-      let screenStream: MediaStream | null = null;
-      if (screenSource) {
-        try {
-          updateStatus("Meminta izin untuk screen recording...");
-          
-          const isElectron = window.navigator.userAgent.toLowerCase().includes('electron');
-          
-          if (isElectron && (window as any).electronAPI && (window as any).electronAPI.getScreenSources) {
-            // Use Electron's desktopCapturer API
-            screenStream = await navigator.mediaDevices.getUserMedia({
-              video: {
-                // @ts-ignore - Electron specific constraint
-                mandatory: {
-                  chromeMediaSource: 'desktop',
-                  chromeMediaSourceId: screenSource.id,
-                  minWidth: 1280,
-                  maxWidth: 1920,
-                  minHeight: 720,
-                  maxHeight: 1080
-                }
-              },
-              audio: false // We'll handle audio separately
-            });
-          } else if (navigator.mediaDevices && 'getDisplayMedia' in navigator.mediaDevices) {
-            // Use web browser's getDisplayMedia with specific constraints based on screenSource type
-            let displayMediaOptions: any = {
-              video: {
-                width: { ideal: 1280, max: 1920 },
-                height: { ideal: 720, max: 1080 },
-                frameRate: { ideal: 30, max: 60 }
-              },
-              audio: false // We'll handle audio separately
-            };
+      // ====== di dalam startMultiCameraStreaming ======
+let screenStream: MediaStream | null = null;
 
-            // Add specific constraints based on screenSource type
-            if (screenSource.type === 'tab') {
-              displayMediaOptions.video.displaySurface = 'browser';
-            } else if (screenSource.type === 'window') {
-              displayMediaOptions.video.displaySurface = 'window';
-            } else {
-              displayMediaOptions.video.displaySurface = 'monitor';
-            }
+if (screenSource) {
+  try {
+    updateStatus("Meminta izin untuk screen share...");
 
-            screenStream = await navigator.mediaDevices.getDisplayMedia(displayMediaOptions);
-          } else {
-            throw new Error("Screen recording tidak didukung di browser ini");
-          }
-          
-          updateStatus("Screen stream berhasil didapatkan...");
-          
-          // Optimize screen stream for memory management
-          const videoTrack = screenStream.getVideoTracks()[0];
-          if (videoTrack) {
-            // Apply constraints to reduce memory usage
-            await videoTrack.applyConstraints({
-              width: { ideal: 1280, max: 1920 },
-              height: { ideal: 720, max: 1080 },
-              frameRate: { ideal: 15, max: 30 }
-            });
-          }
-        } catch (error: any) {
-          console.error("Error getting screen stream:", error);
-          throw new Error(`Gagal mendapatkan screen stream: ${error.message}`);
-        }
+    const isElectron = isElectronReal();
+
+    // ✅ ELECTRON PATH (WAJIB jika electron)
+    if (isElectron) {
+      if (!(window as any).electronAPI?.getScreenSources) {
+        throw new Error("Electron: window.electronAPI.getScreenSources tidak tersedia. Preload tidak ter-load / preload path salah.");
       }
 
-      // Create canvas for composition with optimized size for memory management
-      const canvas = document.createElement('canvas');
-      canvas.width = 1280; // Reduced from 1920 to save memory
-      canvas.height = 720;  // Reduced from 1080 to save memory
-      const ctx = canvas.getContext('2d');
-      if (!ctx) {
-        throw new Error("Gagal membuat canvas context");
+      if (!isValidDesktopId(screenSource?.id)) {
+        throw new Error(`Electron: screenSource.id tidak valid: "${screenSource?.id}". Pastikan berasal dari electronAPI.getScreenSources()`);
       }
-      
-      // Optimize canvas for better memory management
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'medium';
+
+      screenStream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          // @ts-ignore
+          mandatory: {
+            chromeMediaSource: "desktop",
+            chromeMediaSourceId: screenSource.id,
+          },
+        },
+      });
+
+    } else {
+      // ✅ WEB PATH (Chrome/Edge)
+      if (!hasGetDisplayMedia()) {
+        throw new Error("Browser tidak mendukung getDisplayMedia.");
+      }
+
+      screenStream = await (navigator.mediaDevices as any).getDisplayMedia({
+        video: {
+          width: { ideal: 1280, max: 1920 },
+          height: { ideal: 720, max: 1080 },
+          frameRate: { ideal: 30, max: 60 },
+        },
+        audio: false,
+      });
+    }
+
+    if (!screenStream) throw new Error("Gagal mendapatkan screen stream (null).");
+
+    updateStatus("Screen stream berhasil didapatkan...");
+
+    const videoTrack = screenStream.getVideoTracks()[0];
+    if (videoTrack?.applyConstraints) {
+      await videoTrack.applyConstraints({
+         width: { ideal: 1920, max: 1920 },
+    height: { ideal: 1080, max: 1080 },
+    frameRate: { ideal: 30, max: 30 },
+      });
+    }
+
+    if (videoTrack) {
+      videoTrack.onended = () => {
+        updateStatus("Screen share dihentikan oleh user.");
+      };
+    }
+
+  } catch (err: any) {
+    console.error("Error getting screen stream:", err);
+
+    // jangan pakai message "Chrome/Edge + HTTPS" kalau electron
+    const isElectron = isElectronReal();
+    throw new Error(
+      isElectron
+        ? `Gagal screen share di Electron: ${err?.message || err}`
+        : `Gagal mendapatkan screen stream: ${err?.message || "Unknown error"}`
+    );
+  }
+}
+
+
+
+    const targetW = 1920;
+const targetH = 1080;
+const dpr = window.devicePixelRatio || 1;
+
+const canvas = document.createElement("canvas");
+
+// pixel real (tajam)
+canvas.width = Math.round(targetW * dpr);
+canvas.height = Math.round(targetH * dpr);
+
+// ukuran “logis”
+canvas.style.width = `${targetW}px`;
+canvas.style.height = `${targetH}px`;
+
+const ctx = canvas.getContext("2d");
+if (!ctx) throw new Error("Gagal membuat canvas context");
+
+// bikin koordinat tetap pakai 1920x1080
+ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+// penting untuk teks biar tajam (tidak blur)
+ctx.imageSmoothingEnabled = false;
+
 
       // Create video elements for each stream with memory optimization
       const videoElements: { [deviceId: string]: HTMLVideoElement } = {};
@@ -1949,7 +2019,21 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
         // Add to DOM temporarily for streaming
         document.body.appendChild(screenVideoElement);
       }
+// ✅ PRIME SETELAH semua video siap dibuat
+const allVideos: HTMLVideoElement[] = [
+  ...Object.values(videoElements),
+  ...(screenVideoElement ? [screenVideoElement] : []),
+];
 
+for (const v of allVideos) {
+  v.muted = true;
+  v.playsInline = true;
+  try { v.load?.(); } catch {}
+  try { await v.play(); } catch {}
+}
+
+// tunggu semua siap / punya ukuran
+await Promise.all(allVideos.map(v => waitVideoReady(v)));
       // Store references for cleanup
       const activeStreams: [string, MediaStream][] = Object.entries(cameraStreams);
       if (screenStream && screenVideoElement) {
@@ -1964,7 +2048,7 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
       // Background-compatible animation function using setInterval instead of requestAnimationFrame
       let isAnimating = true;
       let animationInterval: NodeJS.Timeout | null = null;
-      const targetFPS = 15; // Reduced from 30 to 15 FPS for screen sharing to save memory
+      const targetFPS = 30; // Reduced from 30 to 15 FPS for screen sharing to save memory
       const frameInterval = 1000 / targetFPS;
       
       // Pre-calculate enabled streams to avoid filtering every frame
@@ -1988,10 +2072,10 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
         updateCachedStreams();
         
         // Clear canvas completely to prevent memory accumulation
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.clearRect(0, 0, targetW, targetH,);
         ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+        ctx.fillRect(0, 0, targetW, targetH);
+
         try {
           const allVideoElements = { ...videoElements };
           if (screenVideoElement) {
@@ -2000,14 +2084,14 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
 
           switch (layoutType) {
             case 'pip':
-              drawPictureInPictureLayout(ctx, canvas.width, canvas.height, cachedEnabledStreams, allVideoElements);
+              drawPictureInPictureLayout(ctx, targetW, targetH, cachedEnabledStreams, allVideoElements);
               break;
             case 'custom':
               const layoutToUse = currentStreamingLayout.current.length > 0 ? currentStreamingLayout.current : (customLayout || []);
               if (layoutToUse.length > 0) {
-                drawCustomLayout(ctx, canvas.width, canvas.height, layoutToUse, allVideoElements);
+                drawCustomLayout(ctx, targetW, targetH, layoutToUse, allVideoElements);
               } else {
-                drawPictureInPictureLayout(ctx, canvas.width, canvas.height, cachedEnabledStreams, allVideoElements);
+                drawPictureInPictureLayout(ctx, targetW, targetH, cachedEnabledStreams, allVideoElements);
               }
               break;
           }
@@ -2017,62 +2101,78 @@ mediaRecorder.start(); // biarkan browser buffer sendiri
       };
       
       // Optimized drawing functions
-      const drawPictureInPictureLayout = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, streams: [string, MediaStream][], videos: { [deviceId: string]: HTMLVideoElement }) => {
-        if (streams.length === 0) return;
-        
-        // Check if screen sharing is included and enabled
-        const screenStream = streams.find(([deviceId]) => deviceId === 'screen');
-        const cameraStreams = streams.filter(([deviceId]) => deviceId !== 'screen');
-        
-        let mainDeviceId: string;
-        
-        if (screenStream) {
-          [mainDeviceId] = screenStream;
-        } else {
-          [mainDeviceId] = streams[0];
-        }
-        
-        const mainVideo = videos[mainDeviceId];
-        if (mainVideo && mainVideo.readyState >= 2) {
-          ctx.drawImage(mainVideo, 0, 0, canvasWidth, canvasHeight);
-        }
-        
-        // Draw other enabled streams as PIP
-        const pipSize = Math.min(canvasWidth, canvasHeight) * 0.25;
-        const otherStreams = screenStream ? cameraStreams : streams.slice(1);
-        
-        otherStreams.forEach(([deviceId], index) => {
-          const video = videos[deviceId];
-          if (video && video.readyState >= 2) {
-            const x = canvasWidth - pipSize - 10;
-            const y = 10 + (index * (pipSize + 10));
-            ctx.drawImage(video, x, y, pipSize, pipSize);
-          }
-        });
-      };
-      
-      const drawCustomLayout = (ctx: CanvasRenderingContext2D, canvasWidth: number, canvasHeight: number, layouts: any[], videos: { [deviceId: string]: HTMLVideoElement }) => {
-        if (layouts.length === 0) return;
-        
-        // Sort layouts by zIndex to draw in correct order
-        const sortedLayouts = [...layouts].sort((a, b) => a.zIndex - b.zIndex);
-        
-        sortedLayouts.filter(layout => layout.enabled !== false).forEach(layout => {
-          const video = videos[layout.deviceId];
-          if (!video || video.readyState < 2) return;
-          
-          // Convert percentage to pixel coordinates
-          const x = (layout.x / 100) * canvasWidth;
-          const y = (layout.y / 100) * canvasHeight;
-          const width = (layout.width / 100) * canvasWidth;
-          const height = (layout.height / 100) * canvasHeight;
-          
-          ctx.drawImage(video, x, y, width, height);
-        });
-      };
+     const drawPictureInPictureLayout = (
+  ctx: CanvasRenderingContext2D,
+  canvasWidth: number,
+  canvasHeight: number,
+  streams: [string, MediaStream][],
+  videos: { [deviceId: string]: HTMLVideoElement }
+) => {
+  if (streams.length === 0) return;
+
+  const screenEntry = streams.find(([deviceId]) => deviceId === "screen");
+  const cameraEntries = streams.filter(([deviceId]) => deviceId !== "screen");
+
+  const mainDeviceId = screenEntry ? screenEntry[0] : streams[0][0];
+  const mainVideo = videos[mainDeviceId];
+
+  if (mainVideo && mainVideo.readyState >= 2 && mainVideo.videoWidth > 0 && mainVideo.videoHeight > 0) {
+    try {
+      ctx.drawImage(mainVideo, 0, 0, canvasWidth, canvasHeight);
+    } catch (e) {
+      console.warn("drawImage main failed", mainDeviceId, e);
+    }
+  }
+
+const pipSize = Math.round(Math.min(canvasWidth, canvasHeight) * 0.25);
+  const otherStreams = screenEntry ? cameraEntries : streams.slice(1);
+
+  otherStreams.forEach(([deviceId], index) => {
+    const video = videos[deviceId];
+    if (!video || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return;
+
+    const x = Math.round(canvasWidth - pipSize - 10);
+const y = Math.round(10 + index * (pipSize + 10));
+
+    try {
+      ctx.drawImage(video, x, y, pipSize, pipSize);
+    } catch (e) {
+      console.warn("drawImage pip failed", deviceId, e);
+    }
+  });
+};
+
+const drawCustomLayout = (
+  ctx: CanvasRenderingContext2D,
+  canvasWidth: number,
+  canvasHeight: number,
+  layouts: any[],
+  videos: { [deviceId: string]: HTMLVideoElement }
+) => {
+  if (layouts.length === 0) return;
+
+  const sortedLayouts = [...layouts].sort((a, b) => a.zIndex - b.zIndex);
+
+  sortedLayouts.filter(l => l.enabled !== false).forEach(layout => {
+    const video = videos[layout.deviceId];
+    if (!video || video.readyState < 2 || video.videoWidth === 0 || video.videoHeight === 0) return;
+
+  const x = Math.round((layout.x / 100) * canvasWidth);
+const y = Math.round((layout.y / 100) * canvasHeight);
+const width = Math.round((layout.width / 100) * canvasWidth);
+const height = Math.round((layout.height / 100) * canvasHeight);
+
+
+    try {
+      ctx.drawImage(video, x, y, width, height);
+    } catch (e) {
+      console.warn("drawImage custom failed", layout.deviceId, e);
+    }
+  });
+};
 
       // Get canvas stream with optimized settings and memory management
-      const canvasStream = canvas.captureStream(15); // Reduced to 15 FPS to match animation FPS and save memory
+      const canvasStream = canvas.captureStream(30); // Reduced to 15 FPS to match animation FPS and save memory
       
       // Store canvas reference for cleanup
       const canvasRef = canvas;

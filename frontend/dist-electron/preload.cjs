@@ -9,11 +9,17 @@ try {
   const electronAPI = Object.freeze({
     isElectron: true,
     testPreload,
+    // ✅ Fullscreen window controls
+    toggleFullscreen: () => electron.ipcRenderer.invoke("window:toggle-fullscreen"),
+    setFullscreen: (value) => electron.ipcRenderer.invoke("window:set-fullscreen", !!value),
+    isFullscreen: () => electron.ipcRenderer.invoke("window:is-fullscreen"),
     // App info
     getAppVersion: () => electron.ipcRenderer.invoke("get-app-version"),
     getAppPath: () => electron.ipcRenderer.invoke("get-app-path"),
     // Screen recording APIs
     getScreenSources: () => electron.ipcRenderer.invoke("get-screen-sources"),
+    writeClipboardText: (text) => electron.ipcRenderer.invoke("clipboard-write-text", text),
+    getViewerCount: (roomId) => electron.ipcRenderer.invoke("get-viewer-count", roomId),
     // Menu events
     onMenuNewRecording: (callback) => {
       electron.ipcRenderer.on("menu-new-recording", callback);

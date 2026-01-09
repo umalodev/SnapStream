@@ -308,10 +308,11 @@ useEffect(() => {
         video = videoElementsRef.current[layout.deviceId] || videoElements[layout.deviceId];
       }
       
-      const x = (layout.x / 100) * canvas.width;
-      const y = (layout.y / 100) * canvas.height;
-      const width = (layout.width / 100) * canvas.width;
-      const height = (layout.height / 100) * canvas.height;
+    const x = Math.round((layout.x / 100) * canvas.width);
+const y = Math.round((layout.y / 100) * canvas.height);
+const width = Math.round((layout.width / 100) * canvas.width);
+const height = Math.round((layout.height / 100) * canvas.height);
+
 
       // Draw placeholder background for this layout area
       ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
@@ -391,39 +392,44 @@ useEffect(() => {
   }, [layouts, videoElements, screenVideoElement]); // Note: We also use refs directly in the function for real-time access
 
   // Sync video elements from ref to state periodically
+  // useEffect(() => {
+  //   const syncInterval = setInterval(() => {
+  //     // Update state from refs to ensure drawCanvas has latest video elements
+  //     setVideoElements({ ...videoElementsRef.current });
+  //     if (screenVideoRef.current) {
+  //       setScreenVideoElement(screenVideoRef.current);
+  //     }
+  //   }, 500); // Sync every 500ms
+
+  //   return () => clearInterval(syncInterval);
+  // }, []);
+
   useEffect(() => {
-    const syncInterval = setInterval(() => {
-      // Update state from refs to ensure drawCanvas has latest video elements
-      setVideoElements({ ...videoElementsRef.current });
-      if (screenVideoRef.current) {
-        setScreenVideoElement(screenVideoRef.current);
-      }
-    }, 500); // Sync every 500ms
+  let rafId: number;
 
-    return () => clearInterval(syncInterval);
-  }, []);
+  const loop = () => {
+    drawCanvas();
+    rafId = requestAnimationFrame(loop);
+  };
 
-  // Update canvas with interval
-  useEffect(() => {
-    const interval = setInterval(() => {
-      drawCanvas();
-    }, 100); // Update every 100ms
+  rafId = requestAnimationFrame(loop);
 
-    return () => clearInterval(interval);
-  }, [drawCanvas]);
+  return () => cancelAnimationFrame(rafId);
+}, [drawCanvas]);
+
 
   // Notify parent only when layouts actually change
-  useEffect(() => {
-  if (layouts.length === 0) return;
+//   useEffect(() => {
+//   if (layouts.length === 0) return;
 
-  const layoutString = JSON.stringify(layouts);
+//   const layoutString = JSON.stringify(layouts);
 
-  if (lastLayoutRef.current === layoutString) return;
+//   if (lastLayoutRef.current === layoutString) return;
 
-  lastLayoutRef.current = layoutString;
+//   lastLayoutRef.current = layoutString;
 
-  onLayoutChange(layouts);
-}, [layouts, onLayoutChange]);
+//   onLayoutChange(layouts);
+// }, [layouts, onLayoutChange]);
 
 
   // Mouse event handlers

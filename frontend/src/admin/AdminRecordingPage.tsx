@@ -10,6 +10,7 @@ import ModalNotifikasi from "../components/ModalNotifikasi";
 import MultiCameraRecorder from "../components/MultiCameraRecorder";
 import BasicLayoutEditor from "../components/BasicLayoutEditor";
 import { API_URL } from "../config";
+import umalo from "@/assets/umalo.png";
 
 // Color palette konsisten dengan AdminPanel
 const LIGHT_GREEN = "#BBF7D0";
@@ -549,6 +550,8 @@ const AdminRecordingPage: React.FC = () => {
     try {
       if (cameras) setRecordingCameras(cameras);
       if (screenSource) setRecordingScreenSource(screenSource);
+      if (customLayout) setRecordingLayouts(customLayout); // ✅ INI
+
 
       setCurrentRecordingLayoutType(layoutType);
 
@@ -985,7 +988,7 @@ const AdminRecordingPage: React.FC = () => {
             {/* Left */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
               <img
-                src="/assets/umalo.png"
+                src={umalo}
                 alt="Umalo"
                 style={{ height: "40px", objectFit: "contain" }}
               />
@@ -1079,6 +1082,50 @@ const AdminRecordingPage: React.FC = () => {
                 <AnimatedDot />
                 Stop Recording
               </button>
+              {/* Edit Layout Button (Fullscreen Recording) */}
+{streamingState.isRecording && currentRecordingLayoutType === "custom" && (
+  <button
+    onClick={() => {
+      // kalau mau load layout yang tersimpan, boleh pakai ini
+      const savedLayout = localStorage.getItem("cameraLayout");
+      if (savedLayout) {
+        try {
+          setRecordingLayouts(JSON.parse(savedLayout));
+        } catch (e) {
+          console.error("Error parsing saved layout:", e);
+        }
+      }
+
+      const savedScreen = localStorage.getItem("screenSource");
+      if (savedScreen) {
+        try {
+          setRecordingScreenSource(JSON.parse(savedScreen));
+        } catch (e) {
+          console.error("Error parsing saved screen source:", e);
+        }
+      }
+
+      setShowRecordingLayoutEditor(true);
+    }}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "8px",
+      padding: "8px 16px",
+      background: "#3b82f6",
+      color: "#fff",
+      border: "none",
+      borderRadius: "4px",
+      fontSize: 14,
+      fontWeight: 600,
+      cursor: "pointer",
+      transition: "all 0.2s ease",
+    }}
+  >
+    🎨 Edit Layout
+  </button>
+)}
+
             </div>
           </div>
 
@@ -1142,6 +1189,44 @@ const AdminRecordingPage: React.FC = () => {
             )}
           </div>
         </div>
+        {/* ✅ Recording Layout Editor Modal (FULLSCREEN RECORDING MODE) */}
+{showRecordingLayoutEditor && (
+  <div
+    style={{
+      position: "fixed",
+      inset: 0,
+      background: "rgba(0,0,0,0.8)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      zIndex: 3000,
+      padding: 20,
+    }}
+  >
+    <div
+      style={{
+        background: "white",
+        borderRadius: 12,
+        padding: 0,
+        maxWidth: 1000,
+        width: "100%",
+        maxHeight: "90vh",
+        overflow: "hidden",
+        boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)",
+        border: "1px solid #e5e7eb",
+      }}
+    >
+      <BasicLayoutEditor
+        cameras={recordingCameras}
+        onLayoutChange={handleRecordingLayoutChange}
+        onClose={() => setShowRecordingLayoutEditor(false)}
+        initialLayouts={recordingLayouts}
+        screenSource={recordingScreenSource}
+      />
+    </div>
+  </div>
+)}
+
       </>
     );
   }

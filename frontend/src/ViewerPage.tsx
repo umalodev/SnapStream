@@ -4,7 +4,7 @@ import { API_URL } from './config';
 import { io } from 'socket.io-client';
 import * as mediasoupClient from 'mediasoup-client';
 import ChatSidebar from './components/ChatSidebar';
-
+import umalo from "@/assets/umalo.png";
 // YouTube-like color palette
 const COLORS = {
   background: '#0f0f0f',
@@ -72,7 +72,7 @@ const ViewerPage: React.FC = () => {
 
     // Initialize chat socket connection
     if (streamId && !chatSocketRef.current) {
-      chatSocketRef.current = io('http://192.168.1.37:4000');
+      chatSocketRef.current = io('http://192.168.0.34:4000');
       console.log('[ViewerPage] Chat socket initialized for stream:', streamId);
     }
 
@@ -319,7 +319,7 @@ const ViewerPage: React.FC = () => {
         setError('Timeout terhubung ke live stream. Pastikan admin sedang streaming dan coba lagi.');
       }, 10000);
       
-      socketRef.current = io('http://192.168.1.37:4000');
+      socketRef.current = io('http://192.168.0.34:4000');
       
       socketRef.current.on('connect', async () => {
         console.log('Connected to MediaSoup server');
@@ -727,7 +727,7 @@ const ViewerPage: React.FC = () => {
             cursor: 'pointer'
           }}>
             <img 
-              src="/assets/umalo.png" 
+              src={umalo}
               alt="Umalo" 
               style={{
                 height: '40px',

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-
+import umalo from "@/assets/umalo.png";
 interface SidebarProps {
   mobileOpen: boolean;
   onMobileToggle: () => void;
@@ -157,7 +157,7 @@ const AdminSidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileToggle }) =>
               <div style={{ fontSize: 11, opacity: 0.6, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
                 Powered by 
                 <img 
-                  src="/assets/umalo.png" 
+                  src={umalo} 
                   alt="Umalo"
                   style={{ height: 14, display: "inline-block" }}
                   onError={(e) => {
@@ -323,7 +323,7 @@ const AdminSidebar: React.FC<SidebarProps> = ({ mobileOpen, onMobileToggle }) =>
               <div style={{ fontSize: 10, opacity: 0.6, marginTop: 2, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 4 }}>
                 Powered by 
                 <img 
-                  src="/assets/umalo.png" 
+                  src={umalo} 
                   alt="Umalo"
                   style={{ height: 14, display: "inline-block" }}
                   onError={(e) => {

@@ -11,6 +11,7 @@ import ChatSidebar from "../components/ChatSidebar";
 import AudioLevelIndicator from "../components/AudioLevelIndicator";
 import { API_URL } from "../config";
 import { io } from 'socket.io-client';
+import umalo from "@/assets/umalo.png";
 
 // Color palette dengan tema hijau muda (#BBF7D0)
 const LIGHT_GREEN = "#BBF7D0";
@@ -156,7 +157,7 @@ useEffect(() => {
 
   // Socket connection for real-time viewer count updates
   useEffect(() => {
-    socketRef.current = io('http://192.168.1.37:4000');
+    socketRef.current = io('http://192.168.0.34:4000');
     
     socketRef.current.on('connect', () => {
       console.log('[AdminLiveStreamPage] Connected to MediaSoup server');
@@ -191,7 +192,7 @@ useEffect(() => {
   // Initialize chat socket connection
   useEffect(() => {
     if (streamingState.roomId && !chatSocketRef.current) {
-      chatSocketRef.current = io('http://192.168.1.37:4000');
+      chatSocketRef.current = io('http://192.168.0.34:4000');
       console.log('[AdminLiveStreamPage] Chat socket initialized for room:', streamingState.roomId);
     }
 
@@ -271,24 +272,44 @@ useEffect(() => {
 
 
   // Fetch viewer count for current stream
-  const fetchViewerCount = useCallback(async () => {
-    if (!streamingState.roomId) return;
-    
-    try {
-      console.log(`[AdminLiveStreamPage] Fetching viewer count for room: ${streamingState.roomId}`);
-      const response = await fetch(`http://192.168.1.37:4000/api/viewer-count/${streamingState.roomId}`);
-      if (response.ok) {
-        const data = await response.json();
-        console.log(`[AdminLiveStreamPage] Viewer count response:`, data);
-        setCurrentViewers(data.viewers);
-        console.log(`[AdminLiveStreamPage] Fetched viewer count: ${data.viewers}`);
+// Fetch viewer count for current stream
+const fetchViewerCount = useCallback(async () => {
+  if (!streamingState.roomId) return;
+
+  try {
+    console.log(`[AdminLiveStreamPage] Fetching viewer count for room: ${streamingState.roomId}`);
+
+    const isElectron = !!(window as any).electronAPI?.getViewerCount;
+
+    // ✅ Electron path (tidak kena CORS)
+    if (isElectron) {
+      const resp = await (window as any).electronAPI.getViewerCount(streamingState.roomId);
+
+      if (resp?.ok && resp?.data) {
+        const viewers = resp.data.viewers ?? resp.data.viewerCount ?? resp.data.count ?? 0;
+        setCurrentViewers(viewers);
+        console.log(`[AdminLiveStreamPage] Fetched viewer count (Electron): ${viewers}`);
       } else {
-        console.error(`[AdminLiveStreamPage] Failed to fetch viewer count: ${response.status}`);
+        console.error(`[AdminLiveStreamPage] Failed viewer count (Electron):`, resp);
       }
-    } catch (error) {
-      console.error('Error fetching viewer count:', error);
+      return;
     }
-  }, [streamingState.roomId]);
+
+    // ✅ Web fallback (butuh CORS backend)
+    const response = await fetch(`http://192.168.0.34:4000/api/viewer-count/${encodeURIComponent(streamingState.roomId)}`);
+    if (response.ok) {
+      const data = await response.json();
+      const viewers = data.viewers ?? data.viewerCount ?? data.count ?? 0;
+      setCurrentViewers(viewers);
+      console.log(`[AdminLiveStreamPage] Fetched viewer count (Web): ${viewers}`);
+    } else {
+      console.error(`[AdminLiveStreamPage] Failed to fetch viewer count: ${response.status}`);
+    }
+  } catch (error) {
+    console.error("Error fetching viewer count:", error);
+  }
+}, [streamingState.roomId]);
+
 
   // Real-time stats updates
   useEffect(() => {
@@ -344,36 +365,37 @@ useEffect(() => {
   };
 
   const handleMultiCameraStartStreaming = async (
-    selectedCameras: string[],
-    layoutType: string,
-    streamJudul: string,
-    customLayout?: any[],
-    selectedCameraDevices?: any[],
-    screenSource?: any
-  ) => {
-    try {
-      await startMultiCameraStreaming(
-        selectedCameras,
-        layoutType,
-        streamJudul,
-        customLayout,
-        screenSource
-      );
-      
-      // Save streaming information for layout editing
-      setStreamingCameras(selectedCameraDevices || []);
-      setStreamingScreenSource(screenSource || null);
-      setStreamingLayouts(customLayout || []);
-      setCurrentStreamingLayoutType(layoutType);
-      
-      setShowMultiCameraStreamer(false);
-      await fetchStreamingStats();
-      showAlert("Multi-camera streaming berhasil dimulai!", "success");
-    } catch (error) {
-      console.error("Error starting multi-camera streaming:", error);
-      showAlert((error as Error).message || "Error memulai multi-camera streaming", "error");
-    }
-  };
+  selectedCameras: string[],
+  layoutType: string,
+  streamJudul: string,
+  customLayout?: any[],
+  selectedCameraDevices?: any[],
+  screenSource?: any
+) => {
+  try {
+    await startMultiCameraStreaming(
+      selectedCameras,
+      layoutType,
+      streamJudul,
+      customLayout,
+      screenSource
+    );
+
+    // ✅ simpan untuk mode live + editor
+    setStreamTitle(streamJudul); // <-- penting, biar title live tidak kosong
+    setStreamingCameras(selectedCameraDevices || []);
+    setStreamingScreenSource(screenSource || null);
+    setStreamingLayouts(customLayout || []); // custom layout awal
+    setCurrentStreamingLayoutType(layoutType);
+
+    setShowMultiCameraStreamer(false);
+    await fetchStreamingStats();
+    showAlert("Multi-camera streaming berhasil dimulai!", "success");
+  } catch (error) {
+    console.error("Error starting multi-camera streaming:", error);
+    showAlert((error as Error).message || "Error memulai multi-camera streaming", "error");
+  }
+};
 
   const handleConfirmStartStream = async () => {
     if (!streamTitle.trim()) {
@@ -441,11 +463,51 @@ useEffect(() => {
     return `${days}h ${remainingHours}j`;
   };
 
-  // Helper function to generate stream URL
-  const generateStreamUrl = (roomId: string) => {
-    // Always use HTTP server to avoid CORS issues
-    return `http://192.168.1.37:3000/#/view/${roomId}`;
-  };
+// Helper function to generate stream URL
+const generateStreamUrl = (roomId: string) => {
+  return `http://192.168.0.34:3000/#/view/${roomId}`;
+};
+
+// ✅ TAMBAHKAN DI SINI (DALAM COMPONENT)
+const copyStreamLink = useCallback(async () => {
+  if (!streamingState.roomId) return;
+
+  const url = generateStreamUrl(streamingState.roomId);
+
+  try {
+    const electronAPI = (window as any).electronAPI;
+
+    // ✅ Electron
+    if (electronAPI?.isElectron && typeof electronAPI.writeClipboardText === "function") {
+      await electronAPI.writeClipboardText(url);
+      showAlert("Link berhasil disalin!", "success");
+      return;
+    }
+
+    // ✅ Web
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url);
+      showAlert("Link berhasil disalin!", "success");
+      return;
+    }
+
+    // ✅ Fallback
+    const ta = document.createElement("textarea");
+    ta.value = url;
+    ta.style.position = "fixed";
+    ta.style.left = "-9999px";
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+
+    showAlert("Link berhasil disalin!", "success");
+  } catch (err) {
+    console.error("Copy link failed:", err);
+    showAlert("Gagal menyalin link (izin clipboard ditolak).", "error");
+  }
+}, [streamingState.roomId, showAlert]);
+
 
   if (loading) {
     return (
@@ -516,7 +578,7 @@ if (streamingState.isStreaming) {
           {/* Left */}
           <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
             <img
-              src="/assets/umalo.png"
+ src={umalo}
               alt="Umalo"
               style={{ height: "40px", objectFit: "contain" }}
             />
@@ -677,43 +739,64 @@ if (streamingState.isStreaming) {
           </div>
 
           {/* ================= ACTION BUTTONS ================= */}
-          <div style={{ display: "flex", gap: "16px", marginBottom: "40px" }}>
-            <button
-              onClick={() => {
-                if (!streamingState.roomId) return;
-                navigator.clipboard.writeText(
-                  generateStreamUrl(streamingState.roomId)
-                );
-                showAlert("Link berhasil disalin!", "success");
-              }}
-              style={{
-                background: "#065fd4",
-                color: "#fff",
-                border: "none",
-                borderRadius: "18px",
-                padding: "14px 32px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              📋 Salin Link 
-            </button>
+          {/* ================= ACTION BUTTONS ================= */}
+<div style={{ display: "flex", gap: "16px", marginBottom: "40px", flexWrap: "wrap" }}>
+  <button
+  onClick={copyStreamLink}
+  style={{
+    background: "#065fd4",
+    color: "#fff",
+    border: "none",
+    borderRadius: "18px",
+    padding: "14px 32px",
+    fontWeight: 600,
+    cursor: "pointer",
+  }}
+>
+  📋 Salin Link
+</button>
 
-            <button
-              onClick={handleStopStream}
-              style={{
-                background: "#ff0000",
-                color: "#fff",
-                border: "none",
-                borderRadius: "18px",
-                padding: "14px 32px",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              ⏹️ Berhenti Live
-            </button>
-          </div>
+
+  {/* ✅ EDIT LAYOUT SAAT LIVE */}
+  <button
+    onClick={() => {
+      // kalau layout belum ada (pip), tetap boleh buka editor (opsional)
+      // minimal: editor dipakai untuk custom layout yg sudah ada
+      if (currentStreamingLayoutType !== "custom") {
+        showAlert("Layout editor tersedia untuk mode Custom Layout.", "info");
+        return;
+      }
+      setShowStreamingLayoutEditor(true);
+    }}
+    style={{
+      background: "#111827",
+      color: "#fff",
+      border: "none",
+      borderRadius: "18px",
+      padding: "14px 32px",
+      fontWeight: 600,
+      cursor: "pointer",
+    }}
+  >
+    🧩 Edit Layout
+  </button>
+
+  <button
+    onClick={handleStopStream}
+    style={{
+      background: "#ff0000",
+      color: "#fff",
+      border: "none",
+      borderRadius: "18px",
+      padding: "14px 32px",
+      fontWeight: 600,
+      cursor: "pointer",
+    }}
+  >
+    ⏹️ Berhenti Live
+  </button>
+</div>
+
         </div>
 
         {/* ================= CHAT SIDEBAR ================= */}
@@ -729,7 +812,40 @@ if (streamingState.isStreaming) {
           />
         )}
       </div>
-
+ {/* ✅ TARUH MODAL EDIT LAYOUT DI SINI */}
+      {showStreamingLayoutEditor && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0, 0, 0, 0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000,
+          padding: '20px'
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '0',
+            maxWidth: '800px',
+            width: '100%',
+            maxHeight: '90vh',
+            overflow: 'auto'
+          }}>
+            <BasicLayoutEditor
+              cameras={streamingCameras}
+              onLayoutChange={handleStreamingLayoutChange}
+              onClose={() => setShowStreamingLayoutEditor(false)}
+              initialLayouts={streamingLayouts}
+              screenSource={streamingScreenSource}
+            />
+          </div>
+        </div>
+      )}
       {/* MODAL */}
       <ModalNotifikasi
         isOpen={showAlertModal}

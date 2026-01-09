@@ -4,8 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { API_URL } from '../config';
 
 // Import images using ES6 imports
-import umaloLogo from '../assets/umalo.png';
-
+import umalo from "@/assets/umalo.png";
+import menu from "@/assets/menu.png";
 // Color palette - Snap Stream theme
 const PRIMARY = '#10b981';
 const PRIMARY_LIGHT = '#34d399';
@@ -278,7 +278,7 @@ const AdminLogin = () => {
                   animation: 'floatLogo 3s ease-in-out infinite',
                 }}>
                   <img 
-                    src="/assets/menu.png" 
+                    src={menu}
                     alt="Menu Icon"
                     style={{
                       height: '32px',
@@ -313,7 +313,7 @@ const AdminLogin = () => {
                   }}>
                     <span>Professional Platform powered by</span>
                     <img 
-                      src={umaloLogo} 
+                      src={umalo} 
                       alt="Umalo Logo"
                       style={{
                         height: '25px',
@@ -738,7 +738,7 @@ const AdminLogin = () => {
               }}>
                 <span>Snap Stream powered by</span>
                 <img 
-                  src={umaloLogo} 
+                  src={umalo} 
                   alt="Umalo Logo"
                   style={{
                     height: '25px',
